@@ -16,7 +16,8 @@ import type {
   Score,
   TimeSignature,
 } from '../types/score'
-import type { Cursor } from '../types/editor'
+import type { Cursor, NormSelection } from '../types/editor'
+import { inNormSelection } from '../types/editor'
 import { makeRest } from '../model/score'
 import { buildStaveNote, type NoteStyle } from './vexMap'
 
@@ -44,6 +45,11 @@ const NOTE_STYLE_PREVIEW: NoteStyle = {
 const NOTE_STYLE_OVERFLOW: NoteStyle = {
   fillStyle: COLOR_OVERFLOW,
   strokeStyle: COLOR_OVERFLOW,
+}
+const COLOR_SELECT = '#8a3ffc'
+const NOTE_STYLE_SELECT: NoteStyle = {
+  fillStyle: COLOR_SELECT,
+  strokeStyle: COLOR_SELECT,
 }
 
 const KEY_NAMES = [
@@ -86,6 +92,8 @@ export interface VexRendererProps {
   ) => void
   /** Highlights the cursor cell in red to signal "tap a note to erase". */
   eraser?: boolean
+  /** Selected element range (highlighted), or null. */
+  selection?: NormSelection | null
   /** Measure index currently being played (highlighted green), or null. */
   playMeasure?: number | null
   /** Only used as a redraw trigger when the active music font changes. */
@@ -101,6 +109,7 @@ export function VexRenderer({
   previewOverflow,
   onCellClick,
   eraser,
+  selection,
   playMeasure,
   fontToken,
 }: VexRendererProps) {
@@ -255,6 +264,7 @@ export function VexRenderer({
             cursor,
             preview: preview ?? null,
             previewOverflow: !!previewOverflow,
+            selection: selection ?? null,
           })
 
           // Cell-level hitbox (fallback / append target).
@@ -291,6 +301,7 @@ export function VexRenderer({
     preview,
     previewOverflow,
     eraser,
+    selection,
     playMeasure,
     fontToken,
   ])
@@ -338,6 +349,7 @@ interface DrawMeasureArgs {
   cursor: Cursor
   preview: NoteElement | null
   previewOverflow: boolean
+  selection: NormSelection | null
 }
 
 interface ElementHit {
@@ -397,8 +409,11 @@ function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
     cursor,
     preview,
     previewOverflow,
+    selection,
   } = args
 
+  const selHere =
+    selection && selection.partIndex === partIndex ? selection : null
   const modelVoices: NoteElement[][] = measure ? measure.voices : [[]]
   const isCursorCell =
     cursor.partIndex === partIndex && cursor.measureIndex === measureIndex
@@ -425,10 +440,18 @@ function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
         return
       }
     } else {
-      for (const el of elements) {
-        const style = overflowExisting ? NOTE_STYLE_OVERFLOW : undefined
+      elements.forEach((el, i) => {
+        const isSel =
+          selHere != null &&
+          vi === selHere.voiceIndex &&
+          inNormSelection(selHere, measureIndex, i)
+        const style = isSel
+          ? NOTE_STYLE_SELECT
+          : overflowExisting
+            ? NOTE_STYLE_OVERFLOW
+            : undefined
         notes.push(buildStaveNote(el, clef, style))
-      }
+      })
       if (showHere && preview) {
         const style = previewOverflow ? NOTE_STYLE_OVERFLOW : NOTE_STYLE_PREVIEW
         notes.push(buildStaveNote(preview, clef, style))

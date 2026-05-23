@@ -165,6 +165,91 @@ export function deleteElement(
   })
 }
 
+/** Deep-clone elements with fresh ids (for copy/paste). */
+export function cloneElements(els: NoteElement[]): NoteElement[] {
+  return els.map((el) => ({
+    ...el,
+    id: uid(),
+    pitches: el.pitches.map((p) => ({ ...p })),
+    duration: {
+      ...el.duration,
+      ...(el.duration.tuplet ? { tuplet: { ...el.duration.tuplet } } : {}),
+    },
+    ...(el.accidentals ? { accidentals: [...el.accidentals] } : {}),
+    ...(el.articulations ? { articulations: [...el.articulations] } : {}),
+  }))
+}
+
+/** Collect elements in [start..end] (inclusive) within one part+voice. */
+export function collectRange(
+  score: Score,
+  partIndex: number,
+  voiceIndex: number,
+  startMeasure: number,
+  startEl: number,
+  endMeasure: number,
+  endEl: number,
+): NoteElement[] {
+  const part = score.parts[partIndex]
+  if (!part) return []
+  const out: NoteElement[] = []
+  for (let mi = startMeasure; mi <= endMeasure; mi++) {
+    const voice = part.measures[mi]?.voices[voiceIndex]
+    if (!voice) continue
+    const from = mi === startMeasure ? startEl : 0
+    const to = mi === endMeasure ? endEl : voice.length - 1
+    for (let i = from; i <= to && i < voice.length; i++) out.push(voice[i])
+  }
+  return out
+}
+
+/** Delete elements in [start..end] (inclusive) within one part+voice. */
+export function deleteRange(
+  score: Score,
+  partIndex: number,
+  voiceIndex: number,
+  startMeasure: number,
+  startEl: number,
+  endMeasure: number,
+  endEl: number,
+): Score {
+  const parts = score.parts.map((p, pi) => {
+    if (pi !== partIndex) return p
+    const measures = p.measures.map((m, mi) => {
+      if (mi < startMeasure || mi > endMeasure) return m
+      const voice = m.voices[voiceIndex]
+      if (!voice) return m
+      const from = mi === startMeasure ? startEl : 0
+      const to = mi === endMeasure ? endEl : voice.length - 1
+      const next = voice.filter((_, i) => i < from || i > to)
+      return replaceVoice(m, voiceIndex, () => next)
+    })
+    return { ...p, measures }
+  })
+  return { ...score, parts }
+}
+
+/** Insert several elements at once into a voice (for paste). */
+export function insertElements(
+  score: Score,
+  partIndex: number,
+  measureIndex: number,
+  voiceIndex: number,
+  elementIndex: number,
+  elements: NoteElement[],
+): Score {
+  if (elements.length === 0) return score
+  return replaceMeasure(score, partIndex, measureIndex, (m) => {
+    if (voiceIndex < 0 || voiceIndex >= m.voices.length) return m
+    return replaceVoice(m, voiceIndex, (voice) => {
+      const next = [...voice]
+      const at = Math.max(0, Math.min(elementIndex, next.length))
+      next.splice(at, 0, ...elements)
+      return next
+    })
+  })
+}
+
 /** Add an empty voice to a measure (caps at 4 voices). */
 export function addVoice(
   score: Score,

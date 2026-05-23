@@ -14,8 +14,14 @@ import {
   setMeasureClef,
   setMeasureKey,
   setMeasureTime,
+  cloneElements,
+  collectRange,
+  deleteRange,
+  insertElements,
 } from './model/score'
 import type { ClickTarget } from './render/VexRenderer'
+import { normalizeSelection } from './types/editor'
+import { Toolbar } from './components/Toolbar'
 import type { InstrumentPreset } from './model/instruments'
 import { midiToPitch } from './model/pitch'
 import {
@@ -77,8 +83,37 @@ export default function App() {
     target?: ClickTarget,
   ) {
     const measure = score.score.parts[partIndex]?.measures[measureIndex]
+
+    // Select mode: tap a note to set/extend the selection.
+    if (input.mode === 'select') {
+      if (target) {
+        input.setSelection((prev) =>
+          prev &&
+          prev.partIndex === partIndex &&
+          prev.voiceIndex === target.voiceIndex
+            ? {
+                ...prev,
+                focus: {
+                  measureIndex,
+                  elementIndex: target.elementIndex,
+                },
+              }
+            : {
+                partIndex,
+                voiceIndex: target.voiceIndex,
+                anchor: { measureIndex, elementIndex: target.elementIndex },
+                focus: { measureIndex, elementIndex: target.elementIndex },
+              },
+        )
+        input.setCursor({ partIndex, measureIndex, ...target })
+      } else {
+        input.setSelection(null)
+      }
+      return
+    }
+
     // Eraser mode: tapping a specific note removes it immediately.
-    if (input.eraser && target) {
+    if (input.mode === 'eraser' && target) {
       score.removeAt({
         partIndex,
         measureIndex,
@@ -159,6 +194,82 @@ export default function App() {
     const next = input.method === 'picker' ? 'keyboard' : 'picker'
     input.setMethod(next)
     update({ inputMethod: next })
+  }
+
+  // ── Selection + clipboard ─────────────────────────────────────────────────
+  const normSelection = useMemo(
+    () => (input.selection ? normalizeSelection(input.selection) : null),
+    [input.selection],
+  )
+
+  function toggleSelect() {
+    input.setMode((m) => (m === 'select' ? 'normal' : 'select'))
+  }
+  function clearSelection() {
+    input.setSelection(null)
+  }
+  function copySelection() {
+    if (!normSelection) return
+    const els = collectRange(
+      score.score,
+      normSelection.partIndex,
+      normSelection.voiceIndex,
+      normSelection.startMeasure,
+      normSelection.startEl,
+      normSelection.endMeasure,
+      normSelection.endEl,
+    )
+    if (els.length > 0) input.setClipboard(cloneElements(els))
+  }
+  function cutSelection() {
+    if (!normSelection) return
+    const n = normSelection
+    const els = collectRange(
+      score.score,
+      n.partIndex,
+      n.voiceIndex,
+      n.startMeasure,
+      n.startEl,
+      n.endMeasure,
+      n.endEl,
+    )
+    if (els.length === 0) return
+    input.setClipboard(cloneElements(els))
+    score.mutate((s) =>
+      deleteRange(
+        s,
+        n.partIndex,
+        n.voiceIndex,
+        n.startMeasure,
+        n.startEl,
+        n.endMeasure,
+        n.endEl,
+      ),
+    )
+    input.setSelection(null)
+    input.setCursor({
+      partIndex: n.partIndex,
+      measureIndex: n.startMeasure,
+      voiceIndex: n.voiceIndex,
+      elementIndex: n.startEl,
+    })
+  }
+  function pasteClipboard() {
+    const clip = input.clipboard
+    if (!clip || clip.length === 0) return
+    const cur = input.cursor
+    const els = cloneElements(clip)
+    score.mutate((s) =>
+      insertElements(
+        s,
+        cur.partIndex,
+        cur.measureIndex,
+        cur.voiceIndex,
+        cur.elementIndex,
+        els,
+      ),
+    )
+    input.setCursor((c) => ({ ...c, elementIndex: c.elementIndex + els.length }))
   }
 
   // ── Ensemble (score manager) ──────────────────────────────────────────────
@@ -407,8 +518,21 @@ export default function App() {
         onRedo={score.redo}
         canUndo={score.canUndo}
         canRedo={score.canRedo}
-        eraser={input.eraser}
-        onToggleEraser={() => input.setEraser((v) => !v)}
+        eraser={input.mode === 'eraser'}
+        onToggleEraser={() =>
+          input.setMode((m) => (m === 'eraser' ? 'normal' : 'eraser'))
+        }
+      />
+
+      <Toolbar
+        mode={input.mode}
+        onToggleSelect={toggleSelect}
+        hasSelection={input.selection !== null}
+        hasClipboard={!!input.clipboard && input.clipboard.length > 0}
+        onCopy={copySelection}
+        onCut={cutSelection}
+        onPaste={pasteClipboard}
+        onClearSelection={clearSelection}
       />
 
       <StaffArea
@@ -419,7 +543,8 @@ export default function App() {
         preview={input.method === 'picker' ? input.previewNote : null}
         previewOverflow={previewOverflow}
         onCellClick={handleCellClick}
-        eraser={input.eraser}
+        eraser={input.mode === 'eraser'}
+        selection={normSelection}
         playMeasure={playback.playMeasure}
         fontToken={activeFont}
       >

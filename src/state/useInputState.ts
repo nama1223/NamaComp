@@ -1,6 +1,11 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { Duration, NoteElement, NoteValue, Step } from '../types/score'
-import type { Cursor, InputMethod } from '../types/editor'
+import type {
+  Cursor,
+  EditMode,
+  InputMethod,
+  Selection,
+} from '../types/editor'
 import { makeNote, makePitch, makeRest } from '../model/score'
 
 export interface PickerState {
@@ -42,7 +47,9 @@ export function useInputState(initialMethod: InputMethod) {
   const [method, setMethod] = useState<InputMethod>(initialMethod)
   const [picker, setPicker] = useState<PickerState>(INITIAL_PICKER)
   const [cursor, setCursor] = useState<Cursor>(INITIAL_CURSOR)
-  const [eraser, setEraser] = useState(false)
+  const [mode, setMode] = useState<EditMode>('normal')
+  const [selection, setSelection] = useState<Selection | null>(null)
+  const [clipboard, setClipboard] = useState<NoteElement[] | null>(null)
 
   const patchPicker = useCallback((patch: Partial<PickerState>) => {
     setPicker((prev) => ({ ...prev, ...patch }))
@@ -87,8 +94,12 @@ export function useInputState(initialMethod: InputMethod) {
     patchPicker,
     cursor,
     setCursor,
-    eraser,
-    setEraser,
+    mode,
+    setMode,
+    selection,
+    setSelection,
+    clipboard,
+    setClipboard,
     previewNote,
     buildNote,
     buildRest,

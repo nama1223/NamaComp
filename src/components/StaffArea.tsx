@@ -9,6 +9,7 @@ import type { NoteElement, Score } from '../types/score'
 import type { Cursor } from '../types/editor'
 import type { MusicFontName } from '../render/fonts'
 import { VexRenderer, type ClickTarget } from '../render/VexRenderer'
+import type { NormSelection } from '../types/editor'
 
 interface StaffAreaProps {
   score: Score
@@ -23,6 +24,7 @@ interface StaffAreaProps {
     target?: ClickTarget,
   ) => void
   eraser?: boolean
+  selection?: NormSelection | null
   playMeasure?: number | null
   fontToken: MusicFontName
   children?: ReactNode
@@ -44,6 +46,7 @@ export function StaffArea({
   previewOverflow,
   onCellClick,
   eraser,
+  selection,
   playMeasure,
   fontToken,
   children,
@@ -181,6 +184,7 @@ export function StaffArea({
           previewOverflow={previewOverflow}
           onCellClick={onCellClick}
           eraser={eraser}
+          selection={selection}
           playMeasure={playMeasure}
           fontToken={fontToken}
         />
