@@ -68,6 +68,16 @@ export function StaffArea({
   const pinch = useRef<{ startDist: number; startZoom: number } | null>(null)
   const pointers = useRef<Map<number, { x: number; y: number }>>(new Map())
 
+  // Mouse drag-to-pan. Touch keeps native pan-x/pan-y scrolling.
+  const pan = useRef<{
+    startX: number
+    startY: number
+    sl: number
+    st: number
+    moved: number
+  } | null>(null)
+  const dragged = useRef(false)
+
   function dist() {
     const pts = [...pointers.current.values()]
     if (pts.length < 2) return 0
@@ -77,12 +87,36 @@ export function StaffArea({
   }
 
   function onPointerDown(e: React.PointerEvent) {
+    if (e.pointerType === 'mouse') {
+      if (e.button !== 0) return
+      const el = scrollRef.current
+      if (!el) return
+      pan.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        sl: el.scrollLeft,
+        st: el.scrollTop,
+        moved: 0,
+      }
+      return
+    }
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     if (pointers.current.size === 2) {
       pinch.current = { startDist: dist(), startZoom: zoom }
     }
   }
   function onPointerMove(e: React.PointerEvent) {
+    if (e.pointerType === 'mouse') {
+      const p = pan.current
+      const el = scrollRef.current
+      if (!p || !el) return
+      const dx = e.clientX - p.startX
+      const dy = e.clientY - p.startY
+      p.moved = Math.max(p.moved, Math.abs(dx) + Math.abs(dy))
+      el.scrollLeft = p.sl - dx
+      el.scrollTop = p.st - dy
+      return
+    }
     if (!pointers.current.has(e.pointerId)) return
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     if (pinch.current && pointers.current.size === 2) {
@@ -95,8 +129,23 @@ export function StaffArea({
     }
   }
   function endPointer(e: React.PointerEvent) {
+    if (e.pointerType === 'mouse') {
+      if (pan.current) {
+        dragged.current = pan.current.moved > 5
+        pan.current = null
+      }
+      return
+    }
     pointers.current.delete(e.pointerId)
     if (pointers.current.size < 2) pinch.current = null
+  }
+
+  // Swallow the click that ends a drag so it doesn't move the cursor.
+  function onClickCapture(e: React.MouseEvent) {
+    if (dragged.current) {
+      e.stopPropagation()
+      dragged.current = false
+    }
   }
 
   useEffect(() => {
@@ -121,6 +170,7 @@ export function StaffArea({
         onPointerUp={endPointer}
         onPointerCancel={endPointer}
         onPointerLeave={endPointer}
+        onClickCapture={onClickCapture}
       >
         <VexRenderer
           score={score}

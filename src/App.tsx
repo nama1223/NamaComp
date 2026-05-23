@@ -7,7 +7,12 @@ import { usePlayback } from './state/usePlayback'
 import { ensureMusicFont, type MusicFontName } from './render/fonts'
 import { makeNote, measureUsedWhole } from './model/score'
 import { midiToPitch } from './model/pitch'
-import { durationToWholeFraction, wouldOverflow } from './model/duration'
+import {
+  durationToWholeFraction,
+  measureCapacityWhole,
+  wouldOverflow,
+} from './model/duration'
+import type { NoteElement } from './types/score'
 import { exportMusicXML, importMusicXML } from './io/musicxml'
 import { exportMIDI } from './io/midi'
 import { downloadText, downloadBytes } from './io/download'
@@ -85,18 +90,36 @@ export default function App() {
     input.setCursor((c) => ({ ...c, elementIndex: target }))
   }
 
+  // Insert an element at the cursor. When the measure becomes full, advance the
+  // cursor to the next measure (auto-appending one if we're at the end).
+  function commitElement(element: NoteElement) {
+    const cur = input.cursor
+    const measure = score.score.parts[cur.partIndex]?.measures[cur.measureIndex]
+    const time = measure?.time ?? score.score.time
+    const used = measure ? measureUsedWhole(measure) : 0
+    const added = durationToWholeFraction(element.duration)
+    const full = used + added >= measureCapacityWhole(time) - 1e-6
+
+    score.insertAtAutoExpand(cur, element, full)
+    if (full) {
+      input.setCursor({
+        partIndex: cur.partIndex,
+        measureIndex: cur.measureIndex + 1,
+        elementIndex: 0,
+      })
+    } else {
+      input.setCursor((c) => ({ ...c, elementIndex: c.elementIndex + 1 }))
+    }
+  }
+
   function commitNote() {
-    score.insertAt(input.cursor, input.buildNote())
-    input.setCursor((c) => ({ ...c, elementIndex: c.elementIndex + 1 }))
+    commitElement(input.buildNote())
   }
   function commitRest() {
-    score.insertAt(input.cursor, input.buildRest())
-    input.setCursor((c) => ({ ...c, elementIndex: c.elementIndex + 1 }))
+    commitElement(input.buildRest())
   }
   function commitMidi(midi: number) {
-    const note = makeNote([midiToPitch(midi)], input.buildDuration())
-    score.insertAt(input.cursor, note)
-    input.setCursor((c) => ({ ...c, elementIndex: c.elementIndex + 1 }))
+    commitElement(makeNote([midiToPitch(midi)], input.buildDuration()))
   }
 
   function switchMethod() {

@@ -27,10 +27,21 @@ function load(): Score {
 
 const HISTORY_LIMIT = 100
 
+interface History {
+  past: Score[]
+  present: Score
+  future: Score[]
+}
+
 export function useScore() {
-  const [present, setPresent] = useState<Score>(load)
-  const [past, setPast] = useState<Score[]>([])
-  const [future, setFuture] = useState<Score[]>([])
+  // Single atomic history object so multiple commits in one event handler
+  // compose correctly (functional updates run in order).
+  const [hist, setHist] = useState<History>(() => ({
+    past: [],
+    present: load(),
+    future: [],
+  }))
+  const present = hist.present
 
   useEffect(() => {
     try {
@@ -40,33 +51,50 @@ export function useScore() {
     }
   }, [present])
 
-  const commit = useCallback(
-    (updater: (s: Score) => Score) => {
-      setPast((p) => {
-        const next = [...p, present]
-        return next.length > HISTORY_LIMIT ? next.slice(-HISTORY_LIMIT) : next
-      })
-      setFuture([])
-      setPresent(updater(present))
-    },
-    [present],
-  )
+  const commit = useCallback((updater: (s: Score) => Score) => {
+    setHist((h) => {
+      const next = updater(h.present)
+      if (next === h.present) return h
+      const past = [...h.past, h.present]
+      return {
+        past: past.length > HISTORY_LIMIT ? past.slice(-HISTORY_LIMIT) : past,
+        present: next,
+        future: [],
+      }
+    })
+  }, [])
 
   const undo = useCallback(() => {
-    if (past.length === 0) return
-    const prev = past[past.length - 1]
-    setPast(past.slice(0, -1))
-    setFuture((f) => [present, ...f])
-    setPresent(prev)
-  }, [past, present])
+    setHist((h) => {
+      if (h.past.length === 0) return h
+      const prev = h.past[h.past.length - 1]
+      return {
+        past: h.past.slice(0, -1),
+        present: prev,
+        future: [h.present, ...h.future],
+      }
+    })
+  }, [])
 
   const redo = useCallback(() => {
-    if (future.length === 0) return
-    const next = future[0]
-    setFuture(future.slice(1))
-    setPast((p) => [...p, present])
-    setPresent(next)
-  }, [future, present])
+    setHist((h) => {
+      if (h.future.length === 0) return h
+      const next = h.future[0]
+      return {
+        past: [...h.past, h.present],
+        present: next,
+        future: h.future.slice(1),
+      }
+    })
+  }, [])
+
+  const setScore = useCallback((s: Score) => {
+    setHist((h) => ({
+      past: [...h.past, h.present].slice(-HISTORY_LIMIT),
+      present: s,
+      future: [],
+    }))
+  }, [])
 
   const insertAt = useCallback(
     (cursor: Cursor, element: NoteElement) => {
@@ -79,6 +107,28 @@ export function useScore() {
           element,
         ),
       )
+    },
+    [commit],
+  )
+
+  /** Insert, and when `full` and the cursor is in the last measure, also append
+   *  a fresh measure — all in one undoable commit (auto measure advance). */
+  const insertAtAutoExpand = useCallback(
+    (cursor: Cursor, element: NoteElement, full: boolean) => {
+      commit((s) => {
+        let next = insertElement(
+          s,
+          cursor.partIndex,
+          cursor.measureIndex,
+          cursor.elementIndex,
+          element,
+        )
+        const count = Math.max(0, ...next.parts.map((p) => p.measures.length))
+        if (full && cursor.measureIndex >= count - 1) {
+          next = appendMeasure(next)
+        }
+        return next
+      })
     },
     [commit],
   )
@@ -121,42 +171,52 @@ export function useScore() {
     [commit],
   )
 
+  // Generic escape hatch for callers that need a custom transform (e.g. the
+  // score manager and mid-piece clef/key edits).
+  const mutate = useCallback(
+    (updater: (s: Score) => Score) => commit(updater),
+    [commit],
+  )
+
   const resetScore = useCallback(() => {
-    setPast([])
-    setFuture([])
-    setPresent(createDefaultScore())
+    setHist({ past: [], present: createDefaultScore(), future: [] })
   }, [])
 
   return useMemo(
     () => ({
       score: present,
-      setScore: setPresent,
+      setScore,
       insertAt,
+      insertAtAutoExpand,
       removeAt,
       addMeasure,
       insertMeasure,
       removeMeasure,
       updateMeta,
       updatePartMeta,
+      mutate,
       undo,
       redo,
-      canUndo: past.length > 0,
-      canRedo: future.length > 0,
+      canUndo: hist.past.length > 0,
+      canRedo: hist.future.length > 0,
       resetScore,
     }),
     [
       present,
+      setScore,
       insertAt,
+      insertAtAutoExpand,
       removeAt,
       addMeasure,
       insertMeasure,
       removeMeasure,
       updateMeta,
       updatePartMeta,
+      mutate,
       undo,
       redo,
-      past.length,
-      future.length,
+      hist.past.length,
+      hist.future.length,
       resetScore,
     ],
   )

@@ -197,6 +197,15 @@ button {
   touch-action: pan-x pan-y;
   -webkit-overflow-scrolling: touch;
 }
+/* Mouse: hint that the staff can be dragged to pan. */
+@media (hover: hover) and (pointer: fine) {
+  .staff-scroll {
+    cursor: grab;
+  }
+  .staff-scroll:active {
+    cursor: grabbing;
+  }
+}
 .vex-host {
   display: inline-block;
   min-width: 100%;
