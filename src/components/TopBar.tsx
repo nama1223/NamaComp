@@ -13,6 +13,7 @@ interface TopBarProps {
   onExportXML: () => void
   onExportMIDI: () => void
   onImportXML: () => void
+  onOpenManager: () => void
   onUndo: () => void
   onRedo: () => void
   canUndo: boolean
@@ -34,6 +35,7 @@ export function TopBar({
   onExportXML,
   onExportMIDI,
   onImportXML,
+  onOpenManager,
   onUndo,
   onRedo,
   canUndo,
@@ -130,6 +132,14 @@ export function TopBar({
               }}
             >
               新規スコア
+            </button>
+            <button
+              onClick={() => {
+                onOpenManager()
+                setMenuOpen(false)
+              }}
+            >
+              楽譜マネージャー（編成）
             </button>
             <button
               onClick={() => {

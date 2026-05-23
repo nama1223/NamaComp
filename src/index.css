@@ -704,6 +704,169 @@ button {
   background: var(--accent);
 }
 
+/* --- Modal (score manager) ----------------------------------------------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 12px;
+}
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  width: min(680px, 100%);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 800;
+}
+.manager-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-dim);
+}
+.modal-close {
+  margin-left: auto;
+  border: none;
+  background: var(--panel-2);
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+}
+.manager-list {
+  overflow: auto;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.manager-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+.manager-idx {
+  flex: 0 0 22px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--fg-dim);
+  font-size: 12px;
+}
+.manager-name {
+  flex: 1 1 70px;
+  min-width: 50px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 6px;
+  background: var(--panel);
+  color: var(--fg);
+}
+.manager-clef {
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 4px;
+  background: var(--panel);
+  color: var(--fg);
+}
+.manager-tr {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+.manager-tr input {
+  width: 46px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+  background: var(--panel);
+  color: var(--fg);
+}
+.manager-move {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.manager-move button {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 5px;
+  width: 24px;
+  height: 17px;
+  font-size: 9px;
+  line-height: 1;
+  padding: 0;
+}
+.manager-del {
+  flex: 0 0 auto;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  background: var(--panel);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+.manager-move button:disabled,
+.manager-del:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.manager-add {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+}
+.manager-add select {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--panel-2);
+  color: var(--fg);
+}
+.manager-add-btn {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.manager-add-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.manager-hint {
+  margin: 0;
+  padding: 0 12px 12px;
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+
 /* --- Tablet / desktop ---------------------------------------------------- */
 
 @media (min-width: 720px) {

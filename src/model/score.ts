@@ -171,3 +171,45 @@ export function updatePart(
   )
   return { ...score, parts }
 }
+
+// --- part / ensemble ops ----------------------------------------------------
+
+export const MAX_PARTS = 36
+
+export interface PartSpec {
+  name: string
+  fullName?: string
+  clef: Clef
+  transpose: number
+}
+
+/** Append a part, matching the current measure count with empty measures. */
+export function addPart(score: Score, spec: PartSpec): Score {
+  if (score.parts.length >= MAX_PARTS) return score
+  const count = Math.max(1, ...score.parts.map((p) => p.measures.length))
+  const part: Part = {
+    id: uid(),
+    name: spec.name,
+    fullName: spec.fullName,
+    clef: spec.clef,
+    transpose: spec.transpose,
+    measures: Array.from({ length: count }, emptyMeasure),
+  }
+  return { ...score, parts: [...score.parts, part] }
+}
+
+/** Remove a part. Always keeps at least one part. */
+export function removePart(score: Score, partIndex: number): Score {
+  if (score.parts.length <= 1) return score
+  return { ...score, parts: score.parts.filter((_, i) => i !== partIndex) }
+}
+
+/** Move a part from one index to another (reorder staves). */
+export function movePart(score: Score, from: number, to: number): Score {
+  const n = score.parts.length
+  if (from === to || from < 0 || from >= n || to < 0 || to >= n) return score
+  const parts = [...score.parts]
+  const [p] = parts.splice(from, 1)
+  parts.splice(to, 0, p)
+  return { ...score, parts }
+}

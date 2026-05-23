@@ -5,7 +5,14 @@ import { useScore } from './state/useScore'
 import { useInputState } from './state/useInputState'
 import { usePlayback } from './state/usePlayback'
 import { ensureMusicFont, type MusicFontName } from './render/fonts'
-import { makeNote, measureUsedWhole } from './model/score'
+import {
+  makeNote,
+  measureUsedWhole,
+  addPart,
+  removePart,
+  movePart,
+} from './model/score'
+import type { InstrumentPreset } from './model/instruments'
 import { midiToPitch } from './model/pitch'
 import {
   durationToWholeFraction,
@@ -23,6 +30,7 @@ import { DrawerRail, type DrawerDef } from './components/Drawer/DrawerRail'
 import { SymbolDrawer } from './components/Drawer/SymbolDrawer'
 import { MeasureDrawer } from './components/Drawer/MeasureDrawer'
 import { PlaybackDrawer } from './components/Drawer/PlaybackDrawer'
+import { ScoreManager } from './components/ScoreManager'
 
 export default function App() {
   const { settings, update } = useSettings()
@@ -30,6 +38,7 @@ export default function App() {
   const input = useInputState(settings.inputMethod)
   const playback = usePlayback()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [showManager, setShowManager] = useState(false)
 
   const [activeFont, setActiveFont] = useState<MusicFontName>('Bravura')
   useEffect(() => {
@@ -126,6 +135,33 @@ export default function App() {
     const next = input.method === 'picker' ? 'keyboard' : 'picker'
     input.setMethod(next)
     update({ inputMethod: next })
+  }
+
+  // ── Ensemble (score manager) ──────────────────────────────────────────────
+  function handleAddPart(preset: InstrumentPreset) {
+    score.mutate((s) => addPart(s, preset))
+  }
+  function handleRemovePart(index: number) {
+    if (score.score.parts.length <= 1) return
+    score.mutate((s) => removePart(s, index))
+    const newLen = score.score.parts.length - 1
+    input.setCursor((c) => {
+      let pi = c.partIndex
+      if (index < pi) pi -= 1
+      else if (index === pi) pi = Math.min(pi, newLen - 1)
+      pi = Math.max(0, Math.min(pi, newLen - 1))
+      return { ...c, partIndex: pi, elementIndex: 0 }
+    })
+  }
+  function handleMovePart(from: number, to: number) {
+    score.mutate((s) => movePart(s, from, to))
+    input.setCursor((c) => {
+      let pi = c.partIndex
+      if (pi === from) pi = to
+      else if (from < pi && pi <= to) pi -= 1
+      else if (to <= pi && pi < from) pi += 1
+      return { ...c, partIndex: pi }
+    })
   }
 
   const measureCount = Math.max(
@@ -256,6 +292,7 @@ export default function App() {
         onExportXML={exportXML}
         onExportMIDI={exportMidi}
         onImportXML={() => fileInputRef.current?.click()}
+        onOpenManager={() => setShowManager(true)}
         onUndo={score.undo}
         onRedo={score.redo}
         canUndo={score.canUndo}
@@ -290,6 +327,17 @@ export default function App() {
         onCommitDelete={commitDelete}
         overflow={previewOverflow}
       />
+
+      {showManager && (
+        <ScoreManager
+          parts={score.score.parts}
+          onClose={() => setShowManager(false)}
+          onAdd={handleAddPart}
+          onRemove={handleRemovePart}
+          onMove={handleMovePart}
+          onUpdate={(i, patch) => score.updatePartMeta(i, patch)}
+        />
+      )}
     </div>
   )
 }
