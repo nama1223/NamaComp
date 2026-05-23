@@ -10,6 +10,8 @@ interface TopBarProps {
   musicFont: MusicFontName
   onSetFont: (f: MusicFontName) => void
   onNewScore: () => void
+  onExportXML: () => void
+  onImportXML: () => void
   onUndo: () => void
   onRedo: () => void
   canUndo: boolean
@@ -26,6 +28,8 @@ export function TopBar({
   musicFont,
   onSetFont,
   onNewScore,
+  onExportXML,
+  onImportXML,
   onUndo,
   onRedo,
   canUndo,
@@ -111,6 +115,22 @@ export function TopBar({
               }}
             >
               新規スコア
+            </button>
+            <button
+              onClick={() => {
+                onImportXML()
+                setMenuOpen(false)
+              }}
+            >
+              MusicXML読み込み
+            </button>
+            <button
+              onClick={() => {
+                onExportXML()
+                setMenuOpen(false)
+              }}
+            >
+              MusicXML書き出し
             </button>
             <button onClick={onToggleTheme}>
               テーマ: {theme === 'light' ? 'ライト' : 'ダーク'}

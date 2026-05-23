@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Clef, TimeSignature } from './types/score'
 import { useSettings } from './state/useSettings'
 import { useScore } from './state/useScore'
@@ -7,6 +7,8 @@ import { usePlayback } from './state/usePlayback'
 import { ensureMusicFont, type MusicFontName } from './render/fonts'
 import { measureUsedWhole } from './model/score'
 import { durationToWholeFraction, wouldOverflow } from './model/duration'
+import { exportMusicXML, importMusicXML } from './io/musicxml'
+import { downloadText } from './io/download'
 import { TopBar } from './components/TopBar'
 import { StaffArea } from './components/StaffArea'
 import { InputArea } from './components/input/InputArea'
@@ -19,6 +21,7 @@ export default function App() {
   const score = useScore()
   const input = useInputState(settings.inputMethod)
   const playback = usePlayback()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [activeFont, setActiveFont] = useState<MusicFontName>('Bravura')
   useEffect(() => {
@@ -68,6 +71,26 @@ export default function App() {
     update({ inputMethod: next })
   }
 
+  function exportXML() {
+    const xml = exportMusicXML(score.score)
+    const safe = score.score.fileName.replace(/[\\/:*?"<>|]/g, '_') || 'score'
+    downloadText(`${safe}.musicxml`, xml, 'application/vnd.recordare.musicxml+xml')
+  }
+
+  function importXML(file: File) {
+    file
+      .text()
+      .then((text) => {
+        const imported = importMusicXML(text)
+        score.setScore(imported)
+        input.setCursor({ partIndex: 0, measureIndex: 0, elementIndex: 0 })
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err)
+        alert(`読み込みに失敗しました: ${msg}`)
+      })
+  }
+
   const drawers: DrawerDef[] = [
     {
       id: 'symbols',
@@ -101,6 +124,17 @@ export default function App() {
 
   return (
     <div className="app">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".musicxml,.xml,application/xml"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) importXML(file)
+          e.target.value = ''
+        }}
+      />
       <TopBar
         fileName={score.score.fileName}
         onRename={(fileName) => score.updateMeta({ fileName })}
@@ -114,6 +148,8 @@ export default function App() {
           score.resetScore()
           input.setCursor({ partIndex: 0, measureIndex: 0, elementIndex: 0 })
         }}
+        onExportXML={exportXML}
+        onImportXML={() => fileInputRef.current?.click()}
         onUndo={score.undo}
         onRedo={score.redo}
         canUndo={score.canUndo}
