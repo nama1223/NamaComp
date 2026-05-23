@@ -10,6 +10,7 @@ import type {
   Pitch,
   Score,
   Step,
+  TimeSignature,
 } from '../types/score'
 import { durationToWholeFraction } from './duration'
 
@@ -153,6 +154,49 @@ export function deleteMeasure(score: Score, measureIndex: number): Score {
   const parts = score.parts.map((p) => ({
     ...p,
     measures: p.measures.filter((_, i) => i !== measureIndex),
+  }))
+  return { ...score, parts }
+}
+
+// --- mid-piece (per-measure) overrides --------------------------------------
+// These persist from the measure they appear on until the next override.
+
+/** Change a single part's clef starting at `measureIndex`. */
+export function setMeasureClef(
+  score: Score,
+  partIndex: number,
+  measureIndex: number,
+  clef: Clef,
+): Score {
+  return replaceMeasure(score, partIndex, measureIndex, (m) => ({ ...m, clef }))
+}
+
+/** Change the key signature for all parts starting at `measureIndex`. */
+export function setMeasureKey(
+  score: Score,
+  measureIndex: number,
+  keyFifths: number,
+): Score {
+  const parts = score.parts.map((p) => ({
+    ...p,
+    measures: p.measures.map((m, i) =>
+      i === measureIndex ? { ...m, keyFifths } : m,
+    ),
+  }))
+  return { ...score, parts }
+}
+
+/** Change the time signature for all parts starting at `measureIndex`. */
+export function setMeasureTime(
+  score: Score,
+  measureIndex: number,
+  time: TimeSignature,
+): Score {
+  const parts = score.parts.map((p) => ({
+    ...p,
+    measures: p.measures.map((m, i) =>
+      i === measureIndex ? { ...m, time } : m,
+    ),
   }))
   return { ...score, parts }
 }

@@ -354,6 +354,9 @@ button {
   gap: 4px;
   align-items: center;
 }
+.scope-row button {
+  font-size: 12px;
+}
 .sym-value,
 .tempo-val {
   min-width: 34px;

@@ -1,6 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { Beam, Formatter, Renderer, Stave, StaveNote, Tuplet, Voice } from 'vexflow'
-import type { Measure, NoteElement, Part, Score } from '../types/score'
+import type {
+  Clef,
+  Measure,
+  NoteElement,
+  Score,
+  TimeSignature,
+} from '../types/score'
 import type { Cursor } from '../types/editor'
 import { makeRest } from '../model/score'
 import { buildStaveNote, type NoteStyle } from './vexMap'
@@ -107,6 +113,60 @@ export function VexRenderer({
     const systemHeight = parts.length * STAVE_H + SYSTEM_GAP
     const logicalH = TOP_PAD + systemCount * systemHeight
 
+    // Per-part running clef/key/time + "changed here" flags, so mid-piece
+    // clef/key/time changes are drawn (and persist) from their measure on.
+    const effClef: Clef[][] = []
+    const clefChange: boolean[][] = []
+    const effKey: number[][] = []
+    const keyChange: boolean[][] = []
+    const effTime: TimeSignature[][] = []
+    const timeChange: boolean[][] = []
+    for (let pi = 0; pi < parts.length; pi++) {
+      const p = parts[pi]
+      let curClef: Clef = p.clef
+      let curKey = score.keyFifths
+      let curTime = score.time
+      const ec: Clef[] = []
+      const cc: boolean[] = []
+      const ek: number[] = []
+      const kc: boolean[] = []
+      const et: TimeSignature[] = []
+      const tc: boolean[] = []
+      for (let mi = 0; mi < totalMeasures; mi++) {
+        const m = p.measures[mi]
+        let clefChg = false
+        let keyChg = false
+        let timeChg = false
+        if (m?.clef && m.clef !== curClef) {
+          curClef = m.clef
+          clefChg = true
+        }
+        if (m && m.keyFifths !== undefined && m.keyFifths !== curKey) {
+          curKey = m.keyFifths
+          keyChg = true
+        }
+        if (
+          m?.time &&
+          (m.time.beats !== curTime.beats || m.time.beatType !== curTime.beatType)
+        ) {
+          curTime = m.time
+          timeChg = true
+        }
+        ec.push(curClef)
+        cc.push(clefChg)
+        ek.push(curKey)
+        kc.push(keyChg)
+        et.push(curTime)
+        tc.push(timeChg)
+      }
+      effClef.push(ec)
+      clefChange.push(cc)
+      effKey.push(ek)
+      keyChange.push(kc)
+      effTime.push(et)
+      timeChange.push(tc)
+    }
+
     const renderer = new Renderer(host, Renderer.Backends.SVG)
     renderer.resize(logicalW * zoom, logicalH * zoom)
     const ctx = renderer.getContext()
@@ -147,12 +207,17 @@ export function VexRenderer({
             ctx.restore()
           }
 
+          const eClef = effClef[pi][measureIndex]
+          const eKey = effKey[pi][measureIndex]
+          const eTime = effTime[pi][measureIndex]
+
           const stave = new Stave(x, y, w)
-          if (isFirst) {
-            stave.addClef(part.clef)
-            stave.addKeySignature(keyName(measure?.keyFifths ?? score.keyFifths))
-            const time = measure?.time ?? score.time
-            stave.addTimeSignature(`${time.beats}/${time.beatType}`)
+          if (isFirst || clefChange[pi][measureIndex]) stave.addClef(eClef)
+          if (isFirst || keyChange[pi][measureIndex]) {
+            stave.addKeySignature(keyName(eKey))
+          }
+          if (isFirst || timeChange[pi][measureIndex]) {
+            stave.addTimeSignature(`${eTime.beats}/${eTime.beatType}`)
           }
           stave.setContext(ctx).draw()
 
@@ -167,12 +232,11 @@ export function VexRenderer({
           const elementHits = drawMeasure({
             ctx,
             stave,
-            part,
+            clef: eClef,
             measure,
             measureIndex,
             partIndex: pi,
-            isFirst,
-            score,
+            time: eTime,
             cursor,
             preview: preview ?? null,
             previewOverflow: !!previewOverflow,
@@ -244,12 +308,11 @@ export function VexRenderer({
 interface DrawMeasureArgs {
   ctx: ReturnType<Renderer['getContext']>
   stave: Stave
-  part: Part
+  clef: Clef
   measure: Measure | undefined
   measureIndex: number
   partIndex: number
-  isFirst: boolean
-  score: Score
+  time: TimeSignature
   cursor: Cursor
   preview: NoteElement | null
   previewOverflow: boolean
@@ -265,12 +328,11 @@ function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
   const {
     ctx,
     stave,
-    part,
+    clef,
     measure,
     measureIndex,
     partIndex,
-    isFirst,
-    score,
+    time,
     cursor,
     preview,
     previewOverflow,
@@ -288,21 +350,20 @@ function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
   const notes: StaveNote[] = []
   if (elements.length === 0 && !showPreview) {
     // Empty measure -> display-only whole rest.
-    notes.push(buildStaveNote(makeRest({ value: 1, dots: 0 }), part.clef))
+    notes.push(buildStaveNote(makeRest({ value: 1, dots: 0 }), clef))
   } else {
     for (const el of elements) {
       const style = overflowExisting ? NOTE_STYLE_OVERFLOW : undefined
-      notes.push(buildStaveNote(el, part.clef, style))
+      notes.push(buildStaveNote(el, clef, style))
     }
     if (showPreview && preview) {
       const style = previewOverflow ? NOTE_STYLE_OVERFLOW : NOTE_STYLE_PREVIEW
-      notes.push(buildStaveNote(preview, part.clef, style))
+      notes.push(buildStaveNote(preview, clef, style))
     }
   }
 
   if (notes.length === 0) return []
 
-  const time = measure?.time ?? score.time
   const voice = new Voice({ numBeats: time.beats, beatValue: time.beatType })
   voice.setStrict(false)
   voice.addTickables(notes)
@@ -342,8 +403,11 @@ function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
     }
   }
 
-  const noteAreaPad = isFirst ? 90 : 22
-  const noteAreaWidth = Math.max(60, stave.getWidth() - noteAreaPad)
+  // Derive the note area from the stave's actual note-start (accounts for any
+  // clef/key/time drawn on this measure, incl. mid-system changes).
+  const areaStartX = stave.getNoteStartX()
+  const endX = stave.getX() + stave.getWidth()
+  const noteAreaWidth = Math.max(60, endX - areaStartX - 14)
 
   try {
     new Formatter().joinVoices([voice]).format([voice], noteAreaWidth)

@@ -11,6 +11,9 @@ import {
   addPart,
   removePart,
   movePart,
+  setMeasureClef,
+  setMeasureKey,
+  setMeasureTime,
 } from './model/score'
 import type { InstrumentPreset } from './model/instruments'
 import { midiToPitch } from './model/pitch'
@@ -227,9 +230,19 @@ export default function App() {
         <SymbolDrawer
           score={score.score}
           cursorPartIndex={input.cursor.partIndex}
+          cursorMeasureIndex={input.cursor.measureIndex}
           onSetClef={(pi, clef: Clef) => score.updatePartMeta(pi, { clef })}
+          onSetMeasureClef={(pi, mi, clef: Clef) =>
+            score.mutate((s) => setMeasureClef(s, pi, mi, clef))
+          }
           onSetKey={(keyFifths) => score.updateMeta({ keyFifths })}
+          onSetMeasureKey={(mi, fifths) =>
+            score.mutate((s) => setMeasureKey(s, mi, fifths))
+          }
           onSetTime={(time: TimeSignature) => score.updateMeta({ time })}
+          onSetMeasureTime={(mi, time: TimeSignature) =>
+            score.mutate((s) => setMeasureTime(s, mi, time))
+          }
         />
       ),
     },
