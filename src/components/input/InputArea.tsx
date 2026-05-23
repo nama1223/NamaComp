@@ -11,6 +11,7 @@ interface InputAreaProps {
   onCommitNote: () => void
   onCommitRest: () => void
   onCommitMidi: (midi: number) => void
+  onCommitDelete: () => void
   overflow: boolean
 }
 
@@ -34,6 +35,7 @@ export function InputArea(props: InputAreaProps) {
             patch={props.patch}
             onCommitNote={props.onCommitNote}
             onCommitRest={props.onCommitRest}
+            onCommitDelete={props.onCommitDelete}
             overflow={props.overflow}
           />
         ) : (
@@ -41,6 +43,7 @@ export function InputArea(props: InputAreaProps) {
             picker={props.picker}
             patch={props.patch}
             onCommitMidi={props.onCommitMidi}
+            onCommitDelete={props.onCommitDelete}
             overflow={props.overflow}
           />
         )}

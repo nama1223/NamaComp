@@ -17,7 +17,12 @@ interface StaffAreaProps {
   cursor: Cursor
   preview: NoteElement | null
   previewOverflow: boolean
-  onCellClick: (partIndex: number, measureIndex: number) => void
+  onCellClick: (
+    partIndex: number,
+    measureIndex: number,
+    elementIndex?: number,
+  ) => void
+  eraser?: boolean
   fontToken: MusicFontName
   children?: ReactNode
 }
@@ -37,6 +42,7 @@ export function StaffArea({
   preview,
   previewOverflow,
   onCellClick,
+  eraser,
   fontToken,
   children,
 }: StaffAreaProps) {
@@ -122,6 +128,7 @@ export function StaffArea({
           preview={preview}
           previewOverflow={previewOverflow}
           onCellClick={onCellClick}
+          eraser={eraser}
           fontToken={fontToken}
         />
       </div>

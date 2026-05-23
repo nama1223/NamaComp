@@ -19,6 +19,7 @@ const COLOR_NORMAL = '#16181d'
 const COLOR_PREVIEW = '#1d6fe0'
 const COLOR_OVERFLOW = '#e23b3b'
 const HILITE = 'rgba(29,111,224,0.10)'
+const HILITE_ERASE = 'rgba(226,59,59,0.12)'
 
 const NOTE_STYLE_PREVIEW: NoteStyle = {
   fillStyle: COLOR_PREVIEW,
@@ -45,6 +46,8 @@ export interface HitBox {
   h: number
   partIndex: number
   measureIndex: number
+  /** When set, this box targets a specific note/rest within the measure. */
+  elementIndex?: number
 }
 
 export interface VexRendererProps {
@@ -54,7 +57,13 @@ export interface VexRendererProps {
   cursor: Cursor
   preview?: NoteElement | null
   previewOverflow?: boolean
-  onCellClick?: (partIndex: number, measureIndex: number) => void
+  onCellClick?: (
+    partIndex: number,
+    measureIndex: number,
+    elementIndex?: number,
+  ) => void
+  /** Highlights the cursor cell in red to signal "tap a note to erase". */
+  eraser?: boolean
   /** Only used as a redraw trigger when the active music font changes. */
   fontToken?: string
 }
@@ -67,6 +76,7 @@ export function VexRenderer({
   preview,
   previewOverflow,
   onCellClick,
+  eraser,
   fontToken,
 }: VexRendererProps) {
   const hostRef = useRef<HTMLDivElement>(null)
@@ -114,13 +124,13 @@ export function VexRenderer({
           const measure = part.measures[measureIndex]
           const y = systemTop + pi * STAVE_H
 
-          // Cursor cell highlight.
+          // Cursor cell highlight (red when erasing).
           if (
             cursor.partIndex === pi &&
             cursor.measureIndex === measureIndex
           ) {
             ctx.save()
-            ctx.setFillStyle(HILITE)
+            ctx.setFillStyle(eraser ? HILITE_ERASE : HILITE)
             ctx.fillRect(x, y - 2, w, 64)
             ctx.restore()
           }
@@ -142,7 +152,7 @@ export function VexRenderer({
             ctx.restore()
           }
 
-          drawMeasure({
+          const elementHits = drawMeasure({
             ctx,
             stave,
             part,
@@ -156,6 +166,7 @@ export function VexRenderer({
             previewOverflow: !!previewOverflow,
           })
 
+          // Cell-level hitbox (fallback / append target).
           hitboxRef.current.push({
             x,
             y: y - 2,
@@ -164,6 +175,18 @@ export function VexRenderer({
             partIndex: pi,
             measureIndex,
           })
+          // Per-note hitboxes (checked first → tap a note to select/erase it).
+          for (const h of elementHits) {
+            hitboxRef.current.push({
+              x: h.x,
+              y: y - 2,
+              w: h.w,
+              h: 64,
+              partIndex: pi,
+              measureIndex,
+              elementIndex: h.elementIndex,
+            })
+          }
         }
         x += w
       }
@@ -177,10 +200,20 @@ export function VexRenderer({
     const rect = svg.getBoundingClientRect()
     const lx = (e.clientX - rect.left) / zoom
     const ly = (e.clientY - rect.top) / zoom
-    const hit = hitboxRef.current.find(
-      (b) => lx >= b.x && lx <= b.x + b.w && ly >= b.y && ly <= b.y + b.h,
+    const inside = (b: HitBox) =>
+      lx >= b.x && lx <= b.x + b.w && ly >= b.y && ly <= b.y + b.h
+    // Prefer a specific note (small band) over the whole-measure cell box.
+    const noteHit = hitboxRef.current.find(
+      (b) => b.elementIndex !== undefined && inside(b),
     )
-    if (hit) onCellClick(hit.partIndex, hit.measureIndex)
+    if (noteHit) {
+      onCellClick(noteHit.partIndex, noteHit.measureIndex, noteHit.elementIndex)
+      return
+    }
+    const cellHit = hitboxRef.current.find(
+      (b) => b.elementIndex === undefined && inside(b),
+    )
+    if (cellHit) onCellClick(cellHit.partIndex, cellHit.measureIndex)
   }
 
   return <div ref={hostRef} className="vex-host" onClick={handleClick} />
@@ -200,7 +233,13 @@ interface DrawMeasureArgs {
   previewOverflow: boolean
 }
 
-function drawMeasure(args: DrawMeasureArgs) {
+interface ElementHit {
+  elementIndex: number
+  x: number
+  w: number
+}
+
+function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
   const {
     ctx,
     stave,
@@ -239,7 +278,7 @@ function drawMeasure(args: DrawMeasureArgs) {
     }
   }
 
-  if (notes.length === 0) return
+  if (notes.length === 0) return []
 
   const time = measure?.time ?? score.time
   const voice = new Voice({ numBeats: time.beats, beatValue: time.beatType })
@@ -266,4 +305,28 @@ function drawMeasure(args: DrawMeasureArgs) {
   for (const beam of beams) {
     beam.setContext(ctx).draw()
   }
+
+  // After formatting, the first `elements.length` notes correspond 1:1 to the
+  // committed elements (preview / empty-rest come after). Map their x → hitboxes.
+  const hits: ElementHit[] = []
+  const realCount = elements.length
+  const PAD_R = 26
+  const staveRight = stave.getX() + stave.getWidth()
+  const startX = stave.getNoteStartX()
+  for (let i = 0; i < realCount; i++) {
+    const note = notes[i]
+    if (!note) break
+    let xi: number
+    try {
+      xi = note.getAbsoluteX()
+    } catch {
+      continue
+    }
+    const prev = i > 0 ? notes[i - 1].getAbsoluteX() : startX
+    const next = i < realCount - 1 ? notes[i + 1].getAbsoluteX() : xi + PAD_R
+    const left = i === 0 ? startX : (prev + xi) / 2
+    const right = i === realCount - 1 ? Math.min(next, staveRight) : (xi + next) / 2
+    hits.push({ elementIndex: i, x: left, w: Math.max(8, right - left) })
+  }
+  return hits
 }

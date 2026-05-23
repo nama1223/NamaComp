@@ -550,6 +550,34 @@ button {
 .commit-rest {
   background: var(--rest-btn);
 }
+.commit-del {
+  background: var(--panel-2);
+  color: var(--danger);
+  border-color: var(--danger) !important;
+  font-size: 15px !important;
+  min-height: 38px !important;
+  flex: 0 0 auto !important;
+}
+
+/* Eraser-mode toggle in the top bar. */
+.eraser-toggle.on {
+  background: var(--danger);
+  color: #fff;
+}
+.eraser-toggle.on:hover {
+  background: var(--danger);
+}
+
+/* Delete button inside the keyboard controls. */
+.kbd-del {
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  background: var(--panel-2);
+  border-radius: 8px;
+  height: 34px;
+  padding: 0 12px;
+  font-weight: 700;
+}
 
 /* --- Keyboard input stub ------------------------------------------------- */
 

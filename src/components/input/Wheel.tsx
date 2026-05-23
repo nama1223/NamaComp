@@ -7,6 +7,8 @@ interface WheelProps<T> {
   render: (item: T) => ReactNode
   wrap?: boolean
   className?: string
+  /** Pixels of vertical swipe (and wheel delta) needed to advance one step. */
+  swipeStep?: number
 }
 
 // A compact 3-row vertical "picker roll": higher value on top, current in the
@@ -19,6 +21,7 @@ export function Wheel<T>({
   render,
   wrap = false,
   className = '',
+  swipeStep = 24,
 }: WheelProps<T>) {
   const n = items.length
   const hiIdx = wrap ? (index + 1) % n : index + 1
@@ -35,30 +38,40 @@ export function Wheel<T>({
     if (dir === 1 && hi !== undefined) onIndex(hiIdx)
     if (dir === -1 && lo !== undefined) onIndex(loIdx)
   }
+  // Keep the latest threshold available to the (once-attached) listeners.
+  const thresholdRef = useRef(swipeStep)
+  thresholdRef.current = swipeStep
 
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
 
     // ── Mouse wheel (non-passive so we can call preventDefault) ──────────
+    // Accumulate delta so trackpads / fine wheels don't over-scroll.
+    let wheelAccum = 0
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault()
-      // deltaY < 0 → scroll up → go hi (higher pitch / longer note on top)
-      stepRef.current(e.deltaY < 0 ? 1 : -1)
+      wheelAccum += e.deltaY
+      const t = thresholdRef.current
+      while (Math.abs(wheelAccum) >= t) {
+        // deltaY < 0 → scroll up → go hi (higher pitch / longer note on top)
+        stepRef.current(wheelAccum < 0 ? 1 : -1)
+        wheelAccum += wheelAccum < 0 ? t : -t
+      }
     }
 
     // ── Touch swipe (vertical) ────────────────────────────────────────────
     let startY = 0
-    const THRESHOLD = 24 // px per step
     const handleTouchStart = (e: TouchEvent) => {
       startY = e.touches[0].clientY
     }
     const handleTouchMove = (e: TouchEvent) => {
       e.preventDefault() // prevent page scroll while swiping the wheel
       const dy = startY - e.touches[0].clientY // positive = swiped up
-      if (Math.abs(dy) >= THRESHOLD) {
+      const t = thresholdRef.current
+      if (Math.abs(dy) >= t) {
         stepRef.current(dy > 0 ? 1 : -1)
-        startY = e.touches[0].clientY // reset so each THRESHOLD px fires once
+        startY = e.touches[0].clientY // reset so each step fires once
       }
     }
 

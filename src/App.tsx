@@ -48,13 +48,39 @@ export default function App() {
     )
   }, [score.score, input.cursor, input.previewNote])
 
-  function handleCellClick(partIndex: number, measureIndex: number) {
+  function handleCellClick(
+    partIndex: number,
+    measureIndex: number,
+    elementIndex?: number,
+  ) {
     const measure = score.score.parts[partIndex]?.measures[measureIndex]
+    // Eraser mode: tapping a specific note removes it immediately.
+    if (input.eraser && elementIndex != null) {
+      score.removeAt({ partIndex, measureIndex, elementIndex })
+      input.setCursor({ partIndex, measureIndex, elementIndex })
+      return
+    }
+    // Otherwise land the cursor on the tapped note, or at the measure end.
     input.setCursor({
       partIndex,
       measureIndex,
-      elementIndex: measure ? measure.elements.length : 0,
+      elementIndex: elementIndex ?? (measure ? measure.elements.length : 0),
     })
+  }
+
+  // Delete the note at the cursor (or the last note if the cursor sits at the
+  // append position). Used by the picker / keyboard 削除 buttons.
+  function commitDelete() {
+    const measure =
+      score.score.parts[input.cursor.partIndex]?.measures[
+        input.cursor.measureIndex
+      ]
+    if (!measure || measure.elements.length === 0) return
+    const last = measure.elements.length - 1
+    const target =
+      input.cursor.elementIndex <= last ? input.cursor.elementIndex : last
+    score.removeAt({ ...input.cursor, elementIndex: target })
+    input.setCursor((c) => ({ ...c, elementIndex: target }))
   }
 
   function commitNote() {
@@ -163,6 +189,8 @@ export default function App() {
         onRedo={score.redo}
         canUndo={score.canUndo}
         canRedo={score.canRedo}
+        eraser={input.eraser}
+        onToggleEraser={() => input.setEraser((v) => !v)}
       />
 
       <StaffArea
@@ -173,6 +201,7 @@ export default function App() {
         preview={input.method === 'picker' ? input.previewNote : null}
         previewOverflow={previewOverflow}
         onCellClick={handleCellClick}
+        eraser={input.eraser}
         fontToken={activeFont}
       >
         <DrawerRail drawers={drawers} />
@@ -186,6 +215,7 @@ export default function App() {
         onCommitNote={commitNote}
         onCommitRest={commitRest}
         onCommitMidi={commitMidi}
+        onCommitDelete={commitDelete}
         overflow={previewOverflow}
       />
     </div>

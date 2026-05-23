@@ -31,6 +31,7 @@ export function useInputState(initialMethod: InputMethod) {
   const [method, setMethod] = useState<InputMethod>(initialMethod)
   const [picker, setPicker] = useState<PickerState>(INITIAL_PICKER)
   const [cursor, setCursor] = useState<Cursor>(INITIAL_CURSOR)
+  const [eraser, setEraser] = useState(false)
 
   const patchPicker = useCallback((patch: Partial<PickerState>) => {
     setPicker((prev) => ({ ...prev, ...patch }))
@@ -71,6 +72,8 @@ export function useInputState(initialMethod: InputMethod) {
     patchPicker,
     cursor,
     setCursor,
+    eraser,
+    setEraser,
     previewNote,
     buildNote,
     buildRest,

@@ -8,6 +8,7 @@ interface PickerRollInputProps {
   patch: (p: Partial<PickerState>) => void
   onCommitNote: () => void
   onCommitRest: () => void
+  onCommitDelete: () => void
   overflow: boolean
 }
 
@@ -61,6 +62,7 @@ export function PickerRollInput({
   patch,
   onCommitNote,
   onCommitRest,
+  onCommitDelete,
   overflow,
 }: PickerRollInputProps) {
   // 音程インデックス: step + octave の両方から決定
@@ -121,6 +123,7 @@ export function PickerRollInput({
           index={valueIndex}
           onIndex={(i) => patch({ value: NOTE_VALUES[i] })}
           wrap /* 全音符 ↔ 64分音符 がループ */
+          swipeStep={48} /* 音価は感度を下げる（誤操作防止） */
           render={(v) => (
             <span>
               <span className="glyph">{VALUE_GLYPH[v]}</span> {VALUE_LABEL[v]}
@@ -170,6 +173,9 @@ export function PickerRollInput({
         </button>
         <button className="commit-rest" onClick={onCommitRest}>
           休符
+        </button>
+        <button className="commit-del" onClick={onCommitDelete}>
+          削除
         </button>
       </div>
     </div>

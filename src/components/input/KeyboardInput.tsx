@@ -8,6 +8,7 @@ interface KeyboardInputProps {
   picker: PickerState
   patch: (p: Partial<PickerState>) => void
   onCommitMidi: (midi: number) => void
+  onCommitDelete: () => void
   overflow: boolean
 }
 
@@ -45,6 +46,7 @@ export function KeyboardInput({
   picker,
   patch,
   onCommitMidi,
+  onCommitDelete,
   overflow,
 }: KeyboardInputProps) {
   const [octave, setOctave] = useState(4)
@@ -104,6 +106,10 @@ export function KeyboardInput({
           <span className="kbd-num">{octave}</span>
           <button onClick={() => setOctave((o) => Math.min(7, o + 1))}>▶</button>
         </div>
+
+        <button className="kbd-del" onClick={onCommitDelete}>
+          削除
+        </button>
       </div>
 
       <div className="kbd-piano">
