@@ -9,7 +9,17 @@ interface ToolbarProps {
   onCut: () => void
   onPaste: () => void
   onClearSelection: () => void
+  onArticulate: (code: string) => void
+  onTie: () => void
 }
+
+const ARTICULATIONS: { code: string; glyph: string; label: string }[] = [
+  { code: 'staccato', glyph: '・', label: 'スタッカート' },
+  { code: 'accent', glyph: '＞', label: 'アクセント' },
+  { code: 'tenuto', glyph: '－', label: 'テヌート' },
+  { code: 'marcato', glyph: '＾', label: 'マルカート' },
+  { code: 'fermata', glyph: '𝄐', label: 'フェルマータ' },
+]
 
 export function Toolbar({
   mode,
@@ -20,6 +30,8 @@ export function Toolbar({
   onCut,
   onPaste,
   onClearSelection,
+  onArticulate,
+  onTie,
 }: ToolbarProps) {
   const selecting = mode === 'select'
   return (
@@ -52,6 +64,30 @@ export function Toolbar({
           onClick={onClearSelection}
         >
           解除
+        </button>
+      </div>
+
+      <div className="tb-sep" />
+
+      <div className="tb-group">
+        {ARTICULATIONS.map((a) => (
+          <button
+            key={a.code}
+            className="tb-btn"
+            title={`${a.label}（選択またはカーソルの音符）`}
+            aria-label={a.label}
+            onClick={() => onArticulate(a.code)}
+          >
+            <span className="tb-glyph">{a.glyph}</span>
+          </button>
+        ))}
+        <button
+          className="tb-btn"
+          title="タイ（次の音符へ）"
+          aria-label="タイ"
+          onClick={onTie}
+        >
+          <span className="tb-glyph">⌒</span>
         </button>
       </div>
     </div>

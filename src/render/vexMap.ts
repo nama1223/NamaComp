@@ -1,9 +1,18 @@
 // Maps NamaComp model elements onto VexFlow tickables. Kept separate from the
 // React renderer so the model<->VexFlow translation is testable in isolation.
 
-import { Accidental, Dot, StaveNote } from 'vexflow'
+import { Accidental, Articulation, Dot, StaveNote } from 'vexflow'
 import type { AccidentalKind, Clef, NoteElement, Pitch } from '../types/score'
 import { vexDuration } from '../model/duration'
+
+// Our articulation code → VexFlow articulation glyph code.
+export const ARTICULATION_VEX: Record<string, string> = {
+  staccato: 'a.',
+  accent: 'a>',
+  tenuto: 'a-',
+  marcato: 'a^',
+  fermata: 'a@a',
+}
 
 const STEP_LOWER: Record<string, string> = {
   C: 'c',
@@ -91,6 +100,22 @@ export function buildStaveNote(
   if (el.duration.dots > 0) {
     for (let d = 0; d < el.duration.dots; d++) {
       Dot.buildAndAttach([note], { all: true })
+    }
+  }
+
+  // Articulations (staccato / accent / tenuto / marcato / fermata).
+  if (el.articulations && el.articulations.length > 0) {
+    for (const a of el.articulations) {
+      const code = ARTICULATION_VEX[a]
+      if (!code) continue
+      try {
+        const art = new Articulation(code)
+        // Fermata always above; others above the note too (clear for drafts).
+        art.setPosition(3) // 3 = ABOVE
+        note.addModifier(art, 0)
+      } catch {
+        /* ignore unknown glyph */
+      }
     }
   }
 

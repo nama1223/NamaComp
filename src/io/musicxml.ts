@@ -86,17 +86,41 @@ function durationDivisions(el: NoteElement): number {
 
 // --- Export -----------------------------------------------------------------
 
-function noteToXml(el: NoteElement, voiceNum: number): string {
+const ARTIC_TO_XML: Record<string, string> = {
+  staccato: '<staccato/>',
+  accent: '<accent/>',
+  tenuto: '<tenuto/>',
+  marcato: '<strong-accent/>',
+}
+
+/** Build the <notations> block for an element (ties, articulations, fermata). */
+function notationsXml(el: NoteElement, tieStop: boolean): string {
+  let inner = ''
+  if (tieStop) inner += '<tied type="stop"/>'
+  if (el.tieStart) inner += '<tied type="start"/>'
+  const arts = (el.articulations ?? []).filter((a) => a in ARTIC_TO_XML)
+  if (arts.length > 0) {
+    inner += `<articulations>${arts.map((a) => ARTIC_TO_XML[a]).join('')}</articulations>`
+  }
+  if ((el.articulations ?? []).includes('fermata')) inner += '<fermata/>'
+  return inner ? `<notations>${inner}</notations>` : ''
+}
+
+function noteToXml(el: NoteElement, voiceNum: number, tieStop: boolean): string {
   const dur = durationDivisions(el)
   const typeName = TYPE_NAME[el.duration.value]
   const dots = '<dot/>'.repeat(el.duration.dots)
   const v = `<voice>${voiceNum}</voice>`
+  const tieEls =
+    (tieStop ? '<tie type="stop"/>' : '') +
+    (el.tieStart ? '<tie type="start"/>' : '')
   const tm = el.duration.tuplet
     ? `<time-modification><actual-notes>${el.duration.tuplet.actual}</actual-notes><normal-notes>${el.duration.tuplet.normal}</normal-notes></time-modification>`
     : ''
 
   if (el.kind === 'rest') {
-    return `<note><rest/><duration>${dur}</duration>${v}<type>${typeName}</type>${dots}${tm}</note>`
+    const notations = notationsXml(el, tieStop)
+    return `<note><rest/><duration>${dur}</duration>${v}<type>${typeName}</type>${dots}${tm}${notations}</note>`
   }
 
   return el.pitches
@@ -105,10 +129,13 @@ function noteToXml(el: NoteElement, voiceNum: number): string {
       const alter = p.alter !== 0 ? `<alter>${p.alter}</alter>` : ''
       const accKind = el.accidentals?.[i] ?? alterToAccidental(p.alter)
       const acc = accKind ? `<accidental>${ACC_TO_XML[accKind]}</accidental>` : ''
+      // Ties/articulations attach to the first notehead of a chord.
+      const tieHere = i === 0 ? tieEls : ''
+      const notations = i === 0 ? notationsXml(el, tieStop) : ''
       return (
         `<note>${chord}` +
         `<pitch><step>${p.step}</step>${alter}<octave>${p.octave}</octave></pitch>` +
-        `<duration>${dur}</duration>${v}<type>${typeName}</type>${dots}${tm}${acc}` +
+        `<duration>${dur}</duration>${tieHere}${v}<type>${typeName}</type>${dots}${tm}${acc}${notations}` +
         `</note>`
       )
     })
@@ -183,7 +210,9 @@ function measureToXml(
       const back = voiceDivisions(measure.voices[vi - 1])
       if (back > 0) notes += `<backup><duration>${back}</duration></backup>`
     }
-    notes += voice.map((el) => noteToXml(el, vi + 1)).join('')
+    notes += voice
+      .map((el, i) => noteToXml(el, vi + 1, i > 0 && !!voice[i - 1].tieStart))
+      .join('')
   })
 
   return `<measure number="${number}">${attributes}${notes}</measure>`
@@ -251,8 +280,33 @@ function parseNote(noteEl: Element): { element: NoteElement; isChord: boolean } 
 
   const duration = { value, dots, ...(tuplet ? { tuplet } : {}) }
 
+  // Notations: articulations, fermata, ties.
+  const articulations: string[] = []
+  const notations = noteEl.querySelector('notations')
+  if (notations) {
+    if (notations.querySelector('articulations staccato')) articulations.push('staccato')
+    if (notations.querySelector('articulations accent')) articulations.push('accent')
+    if (notations.querySelector('articulations tenuto')) articulations.push('tenuto')
+    if (notations.querySelector('articulations strong-accent')) articulations.push('marcato')
+    if (notations.querySelector('fermata')) articulations.push('fermata')
+  }
+  const tieStart =
+    !!noteEl.querySelector('tie[type="start"]') ||
+    !!notations?.querySelector('tied[type="start"]')
+  const tieStop =
+    !!noteEl.querySelector('tie[type="stop"]') ||
+    !!notations?.querySelector('tied[type="stop"]')
+  const extra = {
+    ...(articulations.length > 0 ? { articulations } : {}),
+    ...(tieStart ? { tieStart: true } : {}),
+    ...(tieStop ? { tieStop: true } : {}),
+  }
+
   if (isRest) {
-    return { element: { id: uid(), kind: 'rest', pitches: [], duration }, isChord: false }
+    return {
+      element: { id: uid(), kind: 'rest', pitches: [], duration, ...extra },
+      isChord: false,
+    }
   }
 
   const pitchEl = noteEl.querySelector('pitch')
@@ -268,6 +322,7 @@ function parseNote(noteEl: Element): { element: NoteElement; isChord: boolean } 
     pitches: [{ step, octave, alter }],
     duration,
     accidentals: [accidental],
+    ...extra,
   }
   return { element, isChord }
 }

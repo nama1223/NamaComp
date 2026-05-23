@@ -18,7 +18,10 @@ import {
   collectRange,
   deleteRange,
   insertElements,
+  updateElement,
+  toggleArticulation,
 } from './model/score'
+import type { NoteElement, Score } from './types/score'
 import type { ClickTarget } from './render/VexRenderer'
 import { normalizeSelection } from './types/editor'
 import { Toolbar } from './components/Toolbar'
@@ -29,7 +32,6 @@ import {
   measureCapacityWhole,
   wouldOverflow,
 } from './model/duration'
-import type { NoteElement } from './types/score'
 import { exportMusicXML, importMusicXML } from './io/musicxml'
 import { exportMIDI } from './io/midi'
 import { renderScore } from './audio/render'
@@ -270,6 +272,46 @@ export default function App() {
       ),
     )
     input.setCursor((c) => ({ ...c, elementIndex: c.elementIndex + els.length }))
+  }
+
+  // ── Expression marks (apply to selection, else cursor note) ───────────────
+  function applyToTargets(fn: (el: NoteElement) => NoteElement) {
+    if (normSelection) {
+      const n = normSelection
+      score.mutate((s) => {
+        let next: Score = s
+        for (let mi = n.startMeasure; mi <= n.endMeasure; mi++) {
+          const voice = next.parts[n.partIndex]?.measures[mi]?.voices[n.voiceIndex]
+          if (!voice) continue
+          const from = mi === n.startMeasure ? n.startEl : 0
+          const to = mi === n.endMeasure ? n.endEl : voice.length - 1
+          for (let i = from; i <= to && i < voice.length; i++) {
+            next = updateElement(next, n.partIndex, mi, n.voiceIndex, i, fn)
+          }
+        }
+        return next
+      })
+      return
+    }
+    const cur = input.cursor
+    const voice =
+      score.score.parts[cur.partIndex]?.measures[cur.measureIndex]?.voices[
+        cur.voiceIndex
+      ]
+    if (!voice || voice.length === 0) return
+    const idx =
+      cur.elementIndex < voice.length ? cur.elementIndex : voice.length - 1
+    score.mutate((s) =>
+      updateElement(s, cur.partIndex, cur.measureIndex, cur.voiceIndex, idx, fn),
+    )
+  }
+  function articulate(code: string) {
+    applyToTargets((el) => toggleArticulation(el, code))
+  }
+  function toggleTie() {
+    applyToTargets((el) =>
+      el.kind === 'note' ? { ...el, tieStart: !el.tieStart } : el,
+    )
   }
 
   // ── Ensemble (score manager) ──────────────────────────────────────────────
@@ -533,6 +575,8 @@ export default function App() {
         onCut={cutSelection}
         onPaste={pasteClipboard}
         onClearSelection={clearSelection}
+        onArticulate={articulate}
+        onTie={toggleTie}
       />
 
       <StaffArea

@@ -5,6 +5,7 @@ import {
   Renderer,
   Stave,
   StaveNote,
+  StaveTie,
   Stem,
   Tuplet,
   Voice,
@@ -423,8 +424,12 @@ function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
 
   const vexVoices: Voice[] = []
   const allTuplets: Tuplet[] = []
-  const built: { voiceIndex: number; notes: StaveNote[]; realCount: number }[] =
-    []
+  const built: {
+    voiceIndex: number
+    notes: StaveNote[]
+    realCount: number
+    elements: NoteElement[]
+  }[] = []
 
   modelVoices.forEach((elements, vi) => {
     const showHere = showPreview && vi === cursor.voiceIndex
@@ -479,7 +484,7 @@ function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
     voice.addTickables(notes)
     vexVoices.push(voice)
     allTuplets.push(...buildVoiceTuplets(elements, notes))
-    built.push({ voiceIndex: vi, notes, realCount: elements.length })
+    built.push({ voiceIndex: vi, notes, realCount: elements.length, elements })
   })
 
   if (vexVoices.length === 0) return []
@@ -508,6 +513,24 @@ function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
   for (const voice of vexVoices) voice.draw(ctx, stave)
   for (const beam of beams) beam.setContext(ctx).draw()
   for (const t of allTuplets) t.setContext(ctx).draw()
+
+  // Ties within a voice: element[i].tieStart connects note i → i+1.
+  for (const b of built) {
+    for (let i = 0; i < b.realCount - 1; i++) {
+      if (!b.elements[i]?.tieStart) continue
+      if (!b.notes[i] || !b.notes[i + 1]) continue
+      try {
+        new StaveTie({
+          firstNote: b.notes[i],
+          lastNote: b.notes[i + 1],
+        })
+          .setContext(ctx)
+          .draw()
+      } catch {
+        /* ignore tie failures */
+      }
+    }
+  }
 
   // Per-voice, per-note hitboxes (real committed notes only).
   const hits: ElementHit[] = []

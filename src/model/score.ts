@@ -250,6 +250,32 @@ export function insertElements(
   })
 }
 
+/** Transform a single element in place (immutably). No-op if out of range. */
+export function updateElement(
+  score: Score,
+  partIndex: number,
+  measureIndex: number,
+  voiceIndex: number,
+  elementIndex: number,
+  updater: (el: NoteElement) => NoteElement,
+): Score {
+  return replaceMeasure(score, partIndex, measureIndex, (m) => {
+    if (voiceIndex < 0 || voiceIndex >= m.voices.length) return m
+    return replaceVoice(m, voiceIndex, (voice) =>
+      voice.map((el, i) => (i === elementIndex ? updater(el) : el)),
+    )
+  })
+}
+
+/** Toggle an articulation code on an element (notes only). */
+export function toggleArticulation(el: NoteElement, code: string): NoteElement {
+  if (el.kind !== 'note') return el
+  const cur = el.articulations ?? []
+  const has = cur.includes(code)
+  const next = has ? cur.filter((a) => a !== code) : [...cur, code]
+  return { ...el, articulations: next }
+}
+
 /** Add an empty voice to a measure (caps at 4 voices). */
 export function addVoice(
   score: Score,
