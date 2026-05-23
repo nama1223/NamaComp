@@ -15,6 +15,7 @@ import { StaffArea } from './components/StaffArea'
 import { InputArea } from './components/input/InputArea'
 import { DrawerRail, type DrawerDef } from './components/Drawer/DrawerRail'
 import { SymbolDrawer } from './components/Drawer/SymbolDrawer'
+import { MeasureDrawer } from './components/Drawer/MeasureDrawer'
 import { PlaybackDrawer } from './components/Drawer/PlaybackDrawer'
 
 export default function App() {
@@ -106,6 +107,28 @@ export default function App() {
     update({ inputMethod: next })
   }
 
+  const measureCount = Math.max(
+    1,
+    ...score.score.parts.map((p) => p.measures.length),
+  )
+
+  function appendMeasure() {
+    score.addMeasure()
+  }
+  function insertMeasure() {
+    score.insertMeasure(input.cursor.measureIndex)
+  }
+  function deleteMeasure() {
+    if (measureCount <= 1) return
+    score.removeMeasure(input.cursor.measureIndex)
+    const newMax = measureCount - 1
+    input.setCursor((c) => ({
+      ...c,
+      measureIndex: Math.min(c.measureIndex, newMax - 1),
+      elementIndex: 0,
+    }))
+  }
+
   function exportXML() {
     const xml = exportMusicXML(score.score)
     const safe = score.score.fileName.replace(/[\\/:*?"<>|]/g, '_') || 'score'
@@ -138,6 +161,20 @@ export default function App() {
           onSetClef={(pi, clef: Clef) => score.updatePartMeta(pi, { clef })}
           onSetKey={(keyFifths) => score.updateMeta({ keyFifths })}
           onSetTime={(time: TimeSignature) => score.updateMeta({ time })}
+        />
+      ),
+    },
+    {
+      id: 'measures',
+      label: '小節',
+      icon: '⊞',
+      content: (
+        <MeasureDrawer
+          measureCount={measureCount}
+          cursorMeasureIndex={input.cursor.measureIndex}
+          onAppend={appendMeasure}
+          onInsertAfter={insertMeasure}
+          onDelete={deleteMeasure}
         />
       ),
     },
@@ -202,6 +239,7 @@ export default function App() {
         previewOverflow={previewOverflow}
         onCellClick={handleCellClick}
         eraser={input.eraser}
+        playMeasure={playback.playMeasure}
         fontToken={activeFont}
       >
         <DrawerRail drawers={drawers} />

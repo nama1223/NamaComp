@@ -48,14 +48,41 @@ export function scoreToEvents(score: Score): { events: PlayEvent[]; total: numbe
   return { events, total }
 }
 
+/** Cumulative start time (seconds) of each measure — drives the playhead. */
+export function measureStartTimes(score: Score): number[] {
+  const count = Math.max(0, ...score.parts.map((p) => p.measures.length))
+  if (count === 0) return []
+  const secPerWhole = 240 / score.tempo
+  // The longest part sources per-measure time overrides (falls back to global).
+  const longest = score.parts.reduce(
+    (a, p) => (p.measures.length >= a.measures.length ? p : a),
+    score.parts[0],
+  )
+  const starts: number[] = []
+  let t = 0
+  for (let i = 0; i < count; i++) {
+    starts.push(t)
+    const time = longest.measures[i]?.time ?? score.time
+    t += measureCapacityWhole(time) * secPerWhole
+  }
+  return starts
+}
+
 export class Player {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
   private endTimer: ReturnType<typeof setTimeout> | null = null
+  private startAt = 0
   onEnded: (() => void) | null = null
 
   get isPlaying(): boolean {
     return this.ctx !== null
+  }
+
+  /** Seconds elapsed since playback began (0 before the first note), or null. */
+  get currentTime(): number | null {
+    if (!this.ctx) return null
+    return Math.max(0, this.ctx.currentTime - this.startAt)
   }
 
   play(score: Score): void {
@@ -74,6 +101,7 @@ export class Player {
     this.master = master
 
     const start = ctx.currentTime + 0.06
+    this.startAt = start
     for (const ev of events) {
       this.scheduleNote(ctx, master, ev, start)
     }

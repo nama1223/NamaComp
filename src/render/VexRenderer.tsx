@@ -20,6 +20,7 @@ const COLOR_PREVIEW = '#1d6fe0'
 const COLOR_OVERFLOW = '#e23b3b'
 const HILITE = 'rgba(29,111,224,0.10)'
 const HILITE_ERASE = 'rgba(226,59,59,0.12)'
+const HILITE_PLAY = 'rgba(34,180,90,0.18)'
 
 const NOTE_STYLE_PREVIEW: NoteStyle = {
   fillStyle: COLOR_PREVIEW,
@@ -64,6 +65,8 @@ export interface VexRendererProps {
   ) => void
   /** Highlights the cursor cell in red to signal "tap a note to erase". */
   eraser?: boolean
+  /** Measure index currently being played (highlighted green), or null. */
+  playMeasure?: number | null
   /** Only used as a redraw trigger when the active music font changes. */
   fontToken?: string
 }
@@ -77,6 +80,7 @@ export function VexRenderer({
   previewOverflow,
   onCellClick,
   eraser,
+  playMeasure,
   fontToken,
 }: VexRendererProps) {
   const hostRef = useRef<HTMLDivElement>(null)
@@ -123,6 +127,14 @@ export function VexRenderer({
           const part = parts[pi]
           const measure = part.measures[measureIndex]
           const y = systemTop + pi * STAVE_H
+
+          // Playhead: highlight the measure currently sounding.
+          if (playMeasure === measureIndex) {
+            ctx.save()
+            ctx.setFillStyle(HILITE_PLAY)
+            ctx.fillRect(x, y - 2, w, 64)
+            ctx.restore()
+          }
 
           // Cursor cell highlight (red when erasing).
           if (
@@ -191,7 +203,17 @@ export function VexRenderer({
         x += w
       }
     }
-  }, [score, zoom, containerWidth, cursor, preview, previewOverflow, fontToken])
+  }, [
+    score,
+    zoom,
+    containerWidth,
+    cursor,
+    preview,
+    previewOverflow,
+    eraser,
+    playMeasure,
+    fontToken,
+  ])
 
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
     if (!onCellClick) return

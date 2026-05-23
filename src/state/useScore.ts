@@ -3,9 +3,12 @@ import type { NoteElement, Score } from '../types/score'
 import type { Cursor } from '../types/editor'
 import type { Part } from '../types/score'
 import {
+  appendMeasure,
   createDefaultScore,
   deleteElement,
+  deleteMeasure,
   insertElement,
+  insertMeasureAfter,
   setScoreMeta,
   updatePart,
 } from '../model/score'
@@ -94,6 +97,19 @@ export function useScore() {
     [commit],
   )
 
+  const addMeasure = useCallback(() => commit((s) => appendMeasure(s)), [commit])
+
+  const insertMeasure = useCallback(
+    (measureIndex: number) =>
+      commit((s) => insertMeasureAfter(s, measureIndex)),
+    [commit],
+  )
+
+  const removeMeasure = useCallback(
+    (measureIndex: number) => commit((s) => deleteMeasure(s, measureIndex)),
+    [commit],
+  )
+
   const updateMeta = useCallback(
     (patch: Partial<Score>) => commit((s) => setScoreMeta(s, patch)),
     [commit],
@@ -117,6 +133,9 @@ export function useScore() {
       setScore: setPresent,
       insertAt,
       removeAt,
+      addMeasure,
+      insertMeasure,
+      removeMeasure,
       updateMeta,
       updatePartMeta,
       undo,
@@ -129,6 +148,9 @@ export function useScore() {
       present,
       insertAt,
       removeAt,
+      addMeasure,
+      insertMeasure,
+      removeMeasure,
       updateMeta,
       updatePartMeta,
       undo,

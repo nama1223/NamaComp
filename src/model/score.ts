@@ -124,6 +124,39 @@ export function deleteElement(
   })
 }
 
+// --- measure structure ops --------------------------------------------------
+
+/** Append one empty measure to every part (keeps parts the same length). */
+export function appendMeasure(score: Score): Score {
+  const parts = score.parts.map((p) => ({
+    ...p,
+    measures: [...p.measures, emptyMeasure()],
+  }))
+  return { ...score, parts }
+}
+
+/** Insert an empty measure right after `measureIndex` in every part. */
+export function insertMeasureAfter(score: Score, measureIndex: number): Score {
+  const parts = score.parts.map((p) => {
+    const measures = [...p.measures]
+    const at = Math.max(0, Math.min(measureIndex + 1, measures.length))
+    measures.splice(at, 0, emptyMeasure())
+    return { ...p, measures }
+  })
+  return { ...score, parts }
+}
+
+/** Delete `measureIndex` from every part. Always keeps at least one measure. */
+export function deleteMeasure(score: Score, measureIndex: number): Score {
+  const count = Math.max(0, ...score.parts.map((p) => p.measures.length))
+  if (count <= 1) return score
+  const parts = score.parts.map((p) => ({
+    ...p,
+    measures: p.measures.filter((_, i) => i !== measureIndex),
+  }))
+  return { ...score, parts }
+}
+
 export function setScoreMeta(score: Score, patch: Partial<Score>): Score {
   return { ...score, ...patch }
 }

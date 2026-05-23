@@ -23,6 +23,7 @@ interface StaffAreaProps {
     elementIndex?: number,
   ) => void
   eraser?: boolean
+  playMeasure?: number | null
   fontToken: MusicFontName
   children?: ReactNode
 }
@@ -43,6 +44,7 @@ export function StaffArea({
   previewOverflow,
   onCellClick,
   eraser,
+  playMeasure,
   fontToken,
   children,
 }: StaffAreaProps) {
@@ -129,6 +131,7 @@ export function StaffArea({
           previewOverflow={previewOverflow}
           onCellClick={onCellClick}
           eraser={eraser}
+          playMeasure={playMeasure}
           fontToken={fontToken}
         />
       </div>
