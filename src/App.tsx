@@ -7,7 +7,7 @@ import { usePlayback } from './state/usePlayback'
 import { ensureMusicFont, type MusicFontName } from './render/fonts'
 import {
   makeNote,
-  measureUsedWhole,
+  voiceUsedWhole,
   addPart,
   removePart,
   movePart,
@@ -15,6 +15,7 @@ import {
   setMeasureKey,
   setMeasureTime,
 } from './model/score'
+import type { ClickTarget } from './render/VexRenderer'
 import type { InstrumentPreset } from './model/instruments'
 import { midiToPitch } from './model/pitch'
 import {
@@ -56,11 +57,12 @@ export default function App() {
     }
   }, [settings.musicFont])
 
-  // Does dropping the previewed note into the cursor's measure overflow it?
+  // Does dropping the previewed note into the cursor's voice overflow the bar?
   const previewOverflow = useMemo(() => {
     const part = score.score.parts[input.cursor.partIndex]
     const measure = part?.measures[input.cursor.measureIndex]
-    const used = measure ? measureUsedWhole(measure) : 0
+    const voice = measure?.voices[input.cursor.voiceIndex]
+    const used = voice ? voiceUsedWhole(voice) : 0
     const time = measure?.time ?? score.score.time
     return wouldOverflow(
       used,
@@ -72,32 +74,47 @@ export default function App() {
   function handleCellClick(
     partIndex: number,
     measureIndex: number,
-    elementIndex?: number,
+    target?: ClickTarget,
   ) {
     const measure = score.score.parts[partIndex]?.measures[measureIndex]
     // Eraser mode: tapping a specific note removes it immediately.
-    if (input.eraser && elementIndex != null) {
-      score.removeAt({ partIndex, measureIndex, elementIndex })
-      input.setCursor({ partIndex, measureIndex, elementIndex })
+    if (input.eraser && target) {
+      score.removeAt({
+        partIndex,
+        measureIndex,
+        voiceIndex: target.voiceIndex,
+        elementIndex: target.elementIndex,
+      })
+      input.setCursor({ partIndex, measureIndex, ...target })
       return
     }
-    // Otherwise land the cursor on the tapped note, or at the measure end.
+    if (target) {
+      // Land the cursor on the tapped note (its voice).
+      input.setCursor({ partIndex, measureIndex, ...target })
+      return
+    }
+    // Empty area: keep the active voice (clamped) and go to its end.
+    const voiceCount = measure ? measure.voices.length : 1
+    const voiceIndex = Math.min(input.cursor.voiceIndex, voiceCount - 1)
+    const voice = measure?.voices[voiceIndex]
     input.setCursor({
       partIndex,
       measureIndex,
-      elementIndex: elementIndex ?? (measure ? measure.elements.length : 0),
+      voiceIndex,
+      elementIndex: voice ? voice.length : 0,
     })
   }
 
   // Delete the note at the cursor (or the last note if the cursor sits at the
-  // append position). Used by the picker / keyboard 削除 buttons.
+  // append position) within the active voice. Used by the 削除 buttons.
   function commitDelete() {
     const measure =
       score.score.parts[input.cursor.partIndex]?.measures[
         input.cursor.measureIndex
       ]
-    if (!measure || measure.elements.length === 0) return
-    const last = measure.elements.length - 1
+    const voice = measure?.voices[input.cursor.voiceIndex]
+    if (!voice || voice.length === 0) return
+    const last = voice.length - 1
     const target =
       input.cursor.elementIndex <= last ? input.cursor.elementIndex : last
     score.removeAt({ ...input.cursor, elementIndex: target })
@@ -109,8 +126,9 @@ export default function App() {
   function commitElement(element: NoteElement) {
     const cur = input.cursor
     const measure = score.score.parts[cur.partIndex]?.measures[cur.measureIndex]
+    const voice = measure?.voices[cur.voiceIndex]
     const time = measure?.time ?? score.score.time
-    const used = measure ? measureUsedWhole(measure) : 0
+    const used = voice ? voiceUsedWhole(voice) : 0
     const added = durationToWholeFraction(element.duration)
     const full = used + added >= measureCapacityWhole(time) - 1e-6
 
@@ -119,6 +137,7 @@ export default function App() {
       input.setCursor({
         partIndex: cur.partIndex,
         measureIndex: cur.measureIndex + 1,
+        voiceIndex: cur.voiceIndex,
         elementIndex: 0,
       })
     } else {
@@ -173,6 +192,45 @@ export default function App() {
     1,
     ...score.score.parts.map((p) => p.measures.length),
   )
+
+  // ── Voices (per current measure) ──────────────────────────────────────────
+  const cursorMeasure =
+    score.score.parts[input.cursor.partIndex]?.measures[
+      input.cursor.measureIndex
+    ]
+  const cursorVoiceCount = cursorMeasure ? cursorMeasure.voices.length : 1
+
+  function setActiveVoice(voiceIndex: number) {
+    const vi = Math.max(0, Math.min(voiceIndex, cursorVoiceCount - 1))
+    const voice = cursorMeasure?.voices[vi]
+    input.setCursor((c) => ({
+      ...c,
+      voiceIndex: vi,
+      elementIndex: voice ? voice.length : 0,
+    }))
+  }
+  function addVoice() {
+    score.addVoiceAt(input.cursor.partIndex, input.cursor.measureIndex)
+    // Move to the newly added (last) voice.
+    input.setCursor((c) => ({
+      ...c,
+      voiceIndex: cursorVoiceCount, // old count = new last index
+      elementIndex: 0,
+    }))
+  }
+  function removeVoice() {
+    if (cursorVoiceCount <= 1) return
+    score.removeVoiceAt(
+      input.cursor.partIndex,
+      input.cursor.measureIndex,
+      input.cursor.voiceIndex,
+    )
+    input.setCursor((c) => ({
+      ...c,
+      voiceIndex: Math.max(0, Math.min(c.voiceIndex, cursorVoiceCount - 2)),
+      elementIndex: 0,
+    }))
+  }
 
   function appendMeasure() {
     score.addMeasure()
@@ -234,7 +292,12 @@ export default function App() {
       .then((text) => {
         const imported = importMusicXML(text)
         score.setScore(imported)
-        input.setCursor({ partIndex: 0, measureIndex: 0, elementIndex: 0 })
+        input.setCursor({
+          partIndex: 0,
+          measureIndex: 0,
+          voiceIndex: 0,
+          elementIndex: 0,
+        })
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err)
@@ -278,6 +341,11 @@ export default function App() {
           onAppend={appendMeasure}
           onInsertAfter={insertMeasure}
           onDelete={deleteMeasure}
+          voiceCount={cursorVoiceCount}
+          activeVoice={input.cursor.voiceIndex}
+          onSetVoice={setActiveVoice}
+          onAddVoice={addVoice}
+          onRemoveVoice={removeVoice}
         />
       ),
     },
@@ -321,7 +389,12 @@ export default function App() {
         onSetFont={(f) => update({ musicFont: f })}
         onNewScore={() => {
           score.resetScore()
-          input.setCursor({ partIndex: 0, measureIndex: 0, elementIndex: 0 })
+          input.setCursor({
+          partIndex: 0,
+          measureIndex: 0,
+          voiceIndex: 0,
+          elementIndex: 0,
+        })
         }}
         onExportXML={exportXML}
         onExportMIDI={exportMidi}

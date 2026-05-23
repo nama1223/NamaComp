@@ -3,12 +3,15 @@ import type { NoteElement, Score } from '../types/score'
 import type { Cursor } from '../types/editor'
 import type { Part } from '../types/score'
 import {
+  addVoice,
   appendMeasure,
   createDefaultScore,
   deleteElement,
   deleteMeasure,
   insertElement,
   insertMeasureAfter,
+  migrateScore,
+  removeVoice,
   setScoreMeta,
   updatePart,
 } from '../model/score'
@@ -18,7 +21,7 @@ const KEY = 'namacomp_score_v1'
 function load(): Score {
   try {
     const raw = localStorage.getItem(KEY)
-    if (raw) return JSON.parse(raw) as Score
+    if (raw) return migrateScore(JSON.parse(raw) as Score)
   } catch {
     /* fall through to a fresh score */
   }
@@ -103,6 +106,7 @@ export function useScore() {
           s,
           cursor.partIndex,
           cursor.measureIndex,
+          cursor.voiceIndex,
           cursor.elementIndex,
           element,
         ),
@@ -120,6 +124,7 @@ export function useScore() {
           s,
           cursor.partIndex,
           cursor.measureIndex,
+          cursor.voiceIndex,
           cursor.elementIndex,
           element,
         )
@@ -140,10 +145,23 @@ export function useScore() {
           s,
           cursor.partIndex,
           cursor.measureIndex,
+          cursor.voiceIndex,
           cursor.elementIndex,
         ),
       )
     },
+    [commit],
+  )
+
+  const addVoiceAt = useCallback(
+    (partIndex: number, measureIndex: number) =>
+      commit((s) => addVoice(s, partIndex, measureIndex)),
+    [commit],
+  )
+
+  const removeVoiceAt = useCallback(
+    (partIndex: number, measureIndex: number, voiceIndex: number) =>
+      commit((s) => removeVoice(s, partIndex, measureIndex, voiceIndex)),
     [commit],
   )
 
@@ -189,6 +207,8 @@ export function useScore() {
       insertAt,
       insertAtAutoExpand,
       removeAt,
+      addVoiceAt,
+      removeVoiceAt,
       addMeasure,
       insertMeasure,
       removeMeasure,
@@ -207,6 +227,8 @@ export function useScore() {
       insertAt,
       insertAtAutoExpand,
       removeAt,
+      addVoiceAt,
+      removeVoiceAt,
       addMeasure,
       insertMeasure,
       removeMeasure,

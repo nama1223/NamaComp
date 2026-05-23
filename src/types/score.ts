@@ -66,7 +66,9 @@ export interface TimeSignature {
 
 export interface Measure {
   id: string
-  elements: NoteElement[]
+  /** Independent rhythmic lines on this staff. Always has at least one voice;
+   *  voices[0] is the primary voice. */
+  voices: NoteElement[][]
   /** Optional per-measure overrides; fall back to the part / score defaults. */
   clef?: Clef
   keyFifths?: number

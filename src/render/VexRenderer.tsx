@@ -1,5 +1,14 @@
 import { useEffect, useRef } from 'react'
-import { Beam, Formatter, Renderer, Stave, StaveNote, Tuplet, Voice } from 'vexflow'
+import {
+  Beam,
+  Formatter,
+  Renderer,
+  Stave,
+  StaveNote,
+  Stem,
+  Tuplet,
+  Voice,
+} from 'vexflow'
 import type {
   Clef,
   Measure,
@@ -53,8 +62,14 @@ export interface HitBox {
   h: number
   partIndex: number
   measureIndex: number
-  /** When set, this box targets a specific note/rest within the measure. */
+  /** When set, this box targets a specific note/rest within a voice. */
+  voiceIndex?: number
   elementIndex?: number
+}
+
+export interface ClickTarget {
+  voiceIndex: number
+  elementIndex: number
 }
 
 export interface VexRendererProps {
@@ -67,7 +82,7 @@ export interface VexRendererProps {
   onCellClick?: (
     partIndex: number,
     measureIndex: number,
-    elementIndex?: number,
+    target?: ClickTarget,
   ) => void
   /** Highlights the cursor cell in red to signal "tap a note to erase". */
   eraser?: boolean
@@ -260,6 +275,7 @@ export function VexRenderer({
               h: 64,
               partIndex: pi,
               measureIndex,
+              voiceIndex: h.voiceIndex,
               elementIndex: h.elementIndex,
             })
           }
@@ -289,11 +305,17 @@ export function VexRenderer({
     const inside = (b: HitBox) =>
       lx >= b.x && lx <= b.x + b.w && ly >= b.y && ly <= b.y + b.h
     // Prefer a specific note (small band) over the whole-measure cell box.
-    const noteHit = hitboxRef.current.find(
+    // When voices overlap at the same x, prefer the one in the active voice.
+    const noteHits = hitboxRef.current.filter(
       (b) => b.elementIndex !== undefined && inside(b),
     )
+    const noteHit =
+      noteHits.find((b) => b.voiceIndex === cursor.voiceIndex) ?? noteHits[0]
     if (noteHit) {
-      onCellClick(noteHit.partIndex, noteHit.measureIndex, noteHit.elementIndex)
+      onCellClick(noteHit.partIndex, noteHit.measureIndex, {
+        voiceIndex: noteHit.voiceIndex ?? 0,
+        elementIndex: noteHit.elementIndex ?? 0,
+      })
       return
     }
     const cellHit = hitboxRef.current.find(
@@ -319,9 +341,48 @@ interface DrawMeasureArgs {
 }
 
 interface ElementHit {
+  voiceIndex: number
   elementIndex: number
   x: number
   w: number
+}
+
+// Build the tuplet groups for one voice's notes (mutates notes' tick scaling).
+function buildVoiceTuplets(
+  elements: NoteElement[],
+  notes: StaveNote[],
+): Tuplet[] {
+  const tuplets: Tuplet[] = []
+  const n = elements.length
+  let i = 0
+  while (i < n) {
+    const tup = elements[i].duration.tuplet
+    if (tup && notes[i]) {
+      let j = i + 1
+      while (
+        j < n &&
+        notes[j] &&
+        elements[j].duration.tuplet?.actual === tup.actual &&
+        elements[j].duration.tuplet?.normal === tup.normal
+      ) {
+        j++
+      }
+      try {
+        tuplets.push(
+          new Tuplet(notes.slice(i, j), {
+            numNotes: tup.actual,
+            notesOccupied: tup.normal,
+          }),
+        )
+      } catch {
+        /* ignore a malformed tuplet group */
+      }
+      i = j
+    } else {
+      i++
+    }
+  }
+  return tuplets
 }
 
 function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
@@ -338,70 +399,67 @@ function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
     previewOverflow,
   } = args
 
-  const elements: NoteElement[] = measure ? [...measure.elements] : []
+  const modelVoices: NoteElement[][] = measure ? measure.voices : [[]]
   const isCursorCell =
     cursor.partIndex === partIndex && cursor.measureIndex === measureIndex
   const showPreview = isCursorCell && preview != null
+  const multi = modelVoices.length > 1
+  const allEmpty = modelVoices.every((v) => v.length === 0)
 
-  // When the preview would overflow, colour the already-committed notes red too.
-  const overflowExisting = showPreview && previewOverflow
+  const vexVoices: Voice[] = []
+  const allTuplets: Tuplet[] = []
+  const built: { voiceIndex: number; notes: StaveNote[]; realCount: number }[] =
+    []
 
-  // Build the tickables.
-  const notes: StaveNote[] = []
-  if (elements.length === 0 && !showPreview) {
-    // Empty measure -> display-only whole rest.
-    notes.push(buildStaveNote(makeRest({ value: 1, dots: 0 }), clef))
-  } else {
-    for (const el of elements) {
-      const style = overflowExisting ? NOTE_STYLE_OVERFLOW : undefined
-      notes.push(buildStaveNote(el, clef, style))
-    }
-    if (showPreview && preview) {
-      const style = previewOverflow ? NOTE_STYLE_OVERFLOW : NOTE_STYLE_PREVIEW
-      notes.push(buildStaveNote(preview, clef, style))
-    }
-  }
+  modelVoices.forEach((elements, vi) => {
+    const showHere = showPreview && vi === cursor.voiceIndex
+    const overflowExisting = showHere && previewOverflow
+    const notes: StaveNote[] = []
 
-  if (notes.length === 0) return []
-
-  const voice = new Voice({ numBeats: time.beats, beatValue: time.beatType })
-  voice.setStrict(false)
-  voice.addTickables(notes)
-
-  // Group consecutive committed notes that share a tuplet ratio. Constructed
-  // before formatting so the tuplet tick-scaling is taken into account.
-  const tuplets: Tuplet[] = []
-  {
-    const n = elements.length
-    let i = 0
-    while (i < n) {
-      const tup = elements[i].duration.tuplet
-      if (tup && notes[i]) {
-        let j = i + 1
-        while (
-          j < n &&
-          notes[j] &&
-          elements[j].duration.tuplet?.actual === tup.actual &&
-          elements[j].duration.tuplet?.normal === tup.normal
-        ) {
-          j++
-        }
-        try {
-          tuplets.push(
-            new Tuplet(notes.slice(i, j), {
-              numNotes: tup.actual,
-              notesOccupied: tup.normal,
-            }),
-          )
-        } catch {
-          /* ignore a malformed tuplet group */
-        }
-        i = j
+    if (elements.length === 0 && !showHere) {
+      // Only voice 0 of a fully-empty measure shows a whole rest; extra empty
+      // voices render nothing.
+      if (vi === 0 && allEmpty) {
+        notes.push(buildStaveNote(makeRest({ value: 1, dots: 0 }), clef))
       } else {
-        i++
+        return
+      }
+    } else {
+      for (const el of elements) {
+        const style = overflowExisting ? NOTE_STYLE_OVERFLOW : undefined
+        notes.push(buildStaveNote(el, clef, style))
+      }
+      if (showHere && preview) {
+        const style = previewOverflow ? NOTE_STYLE_OVERFLOW : NOTE_STYLE_PREVIEW
+        notes.push(buildStaveNote(preview, clef, style))
       }
     }
-  }
+
+    if (notes.length === 0) return
+
+    // Fixed stem directions keep two voices visually separated.
+    if (multi) {
+      const dir = vi === 0 ? Stem.UP : vi === 1 ? Stem.DOWN : null
+      if (dir !== null) {
+        for (const n of notes) {
+          try {
+            n.setStemDirection(dir)
+          } catch {
+            /* rests have no stem */
+          }
+        }
+      }
+    }
+
+    const voice = new Voice({ numBeats: time.beats, beatValue: time.beatType })
+    voice.setStrict(false)
+    voice.addTickables(notes)
+    vexVoices.push(voice)
+    allTuplets.push(...buildVoiceTuplets(elements, notes))
+    built.push({ voiceIndex: vi, notes, realCount: elements.length })
+  })
+
+  if (vexVoices.length === 0) return []
 
   // Derive the note area from the stave's actual note-start (accounts for any
   // clef/key/time drawn on this measure, incl. mid-system changes).
@@ -410,47 +468,51 @@ function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
   const noteAreaWidth = Math.max(60, endX - areaStartX - 14)
 
   try {
-    new Formatter().joinVoices([voice]).format([voice], noteAreaWidth)
+    new Formatter().joinVoices(vexVoices).format(vexVoices, noteAreaWidth)
   } catch (err) {
     console.warn('[NamaComp] format failed for measure', measureIndex, err)
   }
 
-  let beams: Beam[] = []
-  try {
-    beams = Beam.generateBeams(notes)
-  } catch {
-    beams = []
+  const beams: Beam[] = []
+  for (const b of built) {
+    try {
+      beams.push(...Beam.generateBeams(b.notes))
+    } catch {
+      /* ignore */
+    }
   }
 
-  voice.draw(ctx, stave)
-  for (const beam of beams) {
-    beam.setContext(ctx).draw()
-  }
-  for (const t of tuplets) {
-    t.setContext(ctx).draw()
-  }
+  for (const voice of vexVoices) voice.draw(ctx, stave)
+  for (const beam of beams) beam.setContext(ctx).draw()
+  for (const t of allTuplets) t.setContext(ctx).draw()
 
-  // After formatting, the first `elements.length` notes correspond 1:1 to the
-  // committed elements (preview / empty-rest come after). Map their x → hitboxes.
+  // Per-voice, per-note hitboxes (real committed notes only).
   const hits: ElementHit[] = []
-  const realCount = elements.length
   const PAD_R = 26
   const staveRight = stave.getX() + stave.getWidth()
   const startX = stave.getNoteStartX()
-  for (let i = 0; i < realCount; i++) {
-    const note = notes[i]
-    if (!note) break
-    let xi: number
-    try {
-      xi = note.getAbsoluteX()
-    } catch {
-      continue
+  for (const b of built) {
+    for (let i = 0; i < b.realCount; i++) {
+      const note = b.notes[i]
+      if (!note) break
+      let xi: number
+      try {
+        xi = note.getAbsoluteX()
+      } catch {
+        continue
+      }
+      const prev = i > 0 ? b.notes[i - 1].getAbsoluteX() : startX
+      const next = i < b.realCount - 1 ? b.notes[i + 1].getAbsoluteX() : xi + PAD_R
+      const left = i === 0 ? startX : (prev + xi) / 2
+      const right =
+        i === b.realCount - 1 ? Math.min(next, staveRight) : (xi + next) / 2
+      hits.push({
+        voiceIndex: b.voiceIndex,
+        elementIndex: i,
+        x: left,
+        w: Math.max(8, right - left),
+      })
     }
-    const prev = i > 0 ? notes[i - 1].getAbsoluteX() : startX
-    const next = i < realCount - 1 ? notes[i + 1].getAbsoluteX() : xi + PAD_R
-    const left = i === 0 ? startX : (prev + xi) / 2
-    const right = i === realCount - 1 ? Math.min(next, staveRight) : (xi + next) / 2
-    hits.push({ elementIndex: i, x: left, w: Math.max(8, right - left) })
   }
   return hits
 }

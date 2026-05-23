@@ -34,7 +34,28 @@ export function makeRest(duration: Duration): NoteElement {
 }
 
 function emptyMeasure(): Measure {
-  return { id: uid(), elements: [] }
+  return { id: uid(), voices: [[]] }
+}
+
+/** Migrate a legacy measure ({elements}) to the voices[][] shape in place-safe
+ *  fashion. Used when loading older persisted scores. */
+export function migrateMeasure(m: Measure & { elements?: NoteElement[] }): Measure {
+  if (Array.isArray(m.voices) && m.voices.length > 0) return m
+  const legacy = Array.isArray(m.elements) ? m.elements : []
+  const { ...rest } = m
+  delete (rest as { elements?: NoteElement[] }).elements
+  return { ...rest, voices: [legacy] }
+}
+
+/** Migrate a whole score's measures to the voices shape (idempotent). */
+export function migrateScore(score: Score): Score {
+  return {
+    ...score,
+    parts: score.parts.map((p) => ({
+      ...p,
+      measures: p.measures.map((m) => migrateMeasure(m)),
+    })),
+  }
 }
 
 function makePart(
@@ -73,11 +94,14 @@ export function createDefaultScore(): Score {
 
 // --- whole-note fraction helpers -------------------------------------------
 
+/** Whole-note fraction used by a single voice. */
+export function voiceUsedWhole(voice: NoteElement[]): number {
+  return voice.reduce((sum, el) => sum + durationToWholeFraction(el.duration), 0)
+}
+
+/** A measure is "as full as its fullest voice". */
 export function measureUsedWhole(measure: Measure): number {
-  return measure.elements.reduce(
-    (sum, el) => sum + durationToWholeFraction(el.duration),
-    0,
-  )
+  return measure.voices.reduce((max, v) => Math.max(max, voiceUsedWhole(v)), 0)
 }
 
 // --- immutable edit ops -----------------------------------------------------
@@ -98,18 +122,31 @@ function replaceMeasure(
   return { ...score, parts }
 }
 
+function replaceVoice(
+  m: Measure,
+  voiceIndex: number,
+  updater: (v: NoteElement[]) => NoteElement[],
+): Measure {
+  const voices = m.voices.map((v, i) => (i === voiceIndex ? updater(v) : v))
+  return { ...m, voices }
+}
+
 export function insertElement(
   score: Score,
   partIndex: number,
   measureIndex: number,
+  voiceIndex: number,
   elementIndex: number,
   element: NoteElement,
 ): Score {
   return replaceMeasure(score, partIndex, measureIndex, (m) => {
-    const elements = [...m.elements]
-    const at = Math.max(0, Math.min(elementIndex, elements.length))
-    elements.splice(at, 0, element)
-    return { ...m, elements }
+    if (voiceIndex < 0 || voiceIndex >= m.voices.length) return m
+    return replaceVoice(m, voiceIndex, (voice) => {
+      const elements = [...voice]
+      const at = Math.max(0, Math.min(elementIndex, elements.length))
+      elements.splice(at, 0, element)
+      return elements
+    })
   })
 }
 
@@ -117,12 +154,40 @@ export function deleteElement(
   score: Score,
   partIndex: number,
   measureIndex: number,
+  voiceIndex: number,
   elementIndex: number,
 ): Score {
   return replaceMeasure(score, partIndex, measureIndex, (m) => {
-    const elements = m.elements.filter((_, i) => i !== elementIndex)
-    return { ...m, elements }
+    if (voiceIndex < 0 || voiceIndex >= m.voices.length) return m
+    return replaceVoice(m, voiceIndex, (voice) =>
+      voice.filter((_, i) => i !== elementIndex),
+    )
   })
+}
+
+/** Add an empty voice to a measure (caps at 4 voices). */
+export function addVoice(
+  score: Score,
+  partIndex: number,
+  measureIndex: number,
+): Score {
+  return replaceMeasure(score, partIndex, measureIndex, (m) =>
+    m.voices.length >= 4 ? m : { ...m, voices: [...m.voices, []] },
+  )
+}
+
+/** Remove a voice from a measure (always keeps at least one). */
+export function removeVoice(
+  score: Score,
+  partIndex: number,
+  measureIndex: number,
+  voiceIndex: number,
+): Score {
+  return replaceMeasure(score, partIndex, measureIndex, (m) =>
+    m.voices.length <= 1
+      ? m
+      : { ...m, voices: m.voices.filter((_, i) => i !== voiceIndex) },
+  )
 }
 
 // --- measure structure ops --------------------------------------------------

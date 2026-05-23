@@ -30,16 +30,19 @@ export function scoreToEvents(score: Score): { events: PlayEvent[]; total: numbe
       if (measure.time) curTime = measure.time
       const measureSec = measureCapacityWhole(curTime) * secPerWhole
 
-      let local = measureStart
-      for (const el of measure.elements) {
-        const durSec = durationToWholeFraction(el.duration) * secPerWhole
-        if (el.kind === 'note') {
-          for (const pitch of el.pitches) {
-            const midi = pitchToMidi(pitch) + part.transpose
-            events.push({ time: local, dur: durSec, freq: midiToFreq(midi) })
+      // Each voice runs in parallel, restarting at the measure boundary.
+      for (const voice of measure.voices) {
+        let local = measureStart
+        for (const el of voice) {
+          const durSec = durationToWholeFraction(el.duration) * secPerWhole
+          if (el.kind === 'note') {
+            for (const pitch of el.pitches) {
+              const midi = pitchToMidi(pitch) + part.transpose
+              events.push({ time: local, dur: durSec, freq: midiToFreq(midi) })
+            }
           }
+          local += durSec
         }
-        local += durSec
       }
       measureStart += measureSec
     }

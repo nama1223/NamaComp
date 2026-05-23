@@ -86,16 +86,17 @@ function durationDivisions(el: NoteElement): number {
 
 // --- Export -----------------------------------------------------------------
 
-function noteToXml(el: NoteElement, clef: Clef): string {
+function noteToXml(el: NoteElement, voiceNum: number): string {
   const dur = durationDivisions(el)
   const typeName = TYPE_NAME[el.duration.value]
   const dots = '<dot/>'.repeat(el.duration.dots)
+  const v = `<voice>${voiceNum}</voice>`
   const tm = el.duration.tuplet
     ? `<time-modification><actual-notes>${el.duration.tuplet.actual}</actual-notes><normal-notes>${el.duration.tuplet.normal}</normal-notes></time-modification>`
     : ''
 
   if (el.kind === 'rest') {
-    return `<note><rest/><duration>${dur}</duration><type>${typeName}</type>${dots}${tm}</note>`
+    return `<note><rest/><duration>${dur}</duration>${v}<type>${typeName}</type>${dots}${tm}</note>`
   }
 
   return el.pitches
@@ -107,11 +108,15 @@ function noteToXml(el: NoteElement, clef: Clef): string {
       return (
         `<note>${chord}` +
         `<pitch><step>${p.step}</step>${alter}<octave>${p.octave}</octave></pitch>` +
-        `<duration>${dur}</duration><type>${typeName}</type>${dots}${tm}${acc}` +
+        `<duration>${dur}</duration>${v}<type>${typeName}</type>${dots}${tm}${acc}` +
         `</note>`
       )
     })
     .join('')
+}
+
+function voiceDivisions(voice: NoteElement[]): number {
+  return voice.reduce((sum, el) => sum + durationDivisions(el), 0)
 }
 
 function alterToAccidental(alter: number): AccidentalKind | null {
@@ -170,7 +175,17 @@ function measureToXml(
   }
 
   const attributes = inner ? `<attributes>${inner}</attributes>` : ''
-  const notes = measure.elements.map((el) => noteToXml(el, part.clef)).join('')
+
+  // Voices: list voice 1, then <backup> to the bar start and list voice 2, etc.
+  let notes = ''
+  measure.voices.forEach((voice, vi) => {
+    if (vi > 0) {
+      const back = voiceDivisions(measure.voices[vi - 1])
+      if (back > 0) notes += `<backup><duration>${back}</duration></backup>`
+    }
+    notes += voice.map((el) => noteToXml(el, vi + 1)).join('')
+  })
+
   return `<measure number="${number}">${attributes}${notes}</measure>`
 }
 
@@ -356,24 +371,35 @@ export function importMusicXML(xml: string): Score {
         }
       }
 
-      const elements: NoteElement[] = []
+      // Group notes by their <voice> number (chords merge within a voice).
+      const voiceMap = new Map<string, NoteElement[]>()
+      const voiceOrder: string[] = []
       measureEl.querySelectorAll('note').forEach((noteEl) => {
+        const vNum = textOf(noteEl, 'voice') ?? '1'
+        if (!voiceMap.has(vNum)) {
+          voiceMap.set(vNum, [])
+          voiceOrder.push(vNum)
+        }
+        const bucket = voiceMap.get(vNum)!
         const { element, isChord } = parseNote(noteEl)
-        if (isChord && elements.length > 0) {
-          const prev = elements[elements.length - 1]
+        if (isChord && bucket.length > 0) {
+          const prev = bucket[bucket.length - 1]
           prev.pitches.push(...element.pitches)
           prev.accidentals = [
             ...(prev.accidentals ?? []),
             ...(element.accidentals ?? [null]),
           ]
         } else {
-          elements.push(element)
+          bucket.push(element)
         }
       })
+      voiceOrder.sort((a, b) => Number(a) - Number(b))
+      const voices =
+        voiceOrder.length > 0 ? voiceOrder.map((v) => voiceMap.get(v)!) : [[]]
 
       measures.push({
         id: uid(),
-        elements,
+        voices,
         ...(mClef ? { clef: mClef } : {}),
         ...(mKey !== undefined ? { keyFifths: mKey } : {}),
         ...(mTime ? { time: mTime } : {}),
@@ -385,7 +411,7 @@ export function importMusicXML(xml: string): Score {
       name: nameById.get(id) ?? id,
       clef,
       transpose,
-      measures: measures.length > 0 ? measures : [{ id: uid(), elements: [] }],
+      measures: measures.length > 0 ? measures : [{ id: uid(), voices: [[]] }],
     })
   })
 

@@ -27,6 +27,7 @@ const INITIAL_PICKER: PickerState = {
 const INITIAL_CURSOR: Cursor = {
   partIndex: 0,
   measureIndex: 0,
+  voiceIndex: 0,
   elementIndex: 0,
 }
 

@@ -78,30 +78,33 @@ function buildPartTrack(part: Part, channelIndex: number, score: Score): number[
   let curTime = score.time
   for (const measure of part.measures) {
     if (measure.time) curTime = measure.time
-    let local = measureStart
-    for (const el of measure.elements) {
-      const durTick = Math.round(
-        durationToWholeFraction(el.duration) * TICKS_PER_WHOLE,
-      )
-      if (el.kind === 'note') {
-        for (const pitch of el.pitches) {
-          const key = Math.max(
-            0,
-            Math.min(127, pitchToMidi(pitch) + part.transpose),
-          )
-          events.push({
-            tick: local,
-            order: 1,
-            data: [0x90 | channel, key, VELOCITY],
-          })
-          events.push({
-            tick: local + durTick,
-            order: 0,
-            data: [0x80 | channel, key, 0],
-          })
+    // Each voice restarts at the measure boundary.
+    for (const voice of measure.voices) {
+      let local = measureStart
+      for (const el of voice) {
+        const durTick = Math.round(
+          durationToWholeFraction(el.duration) * TICKS_PER_WHOLE,
+        )
+        if (el.kind === 'note') {
+          for (const pitch of el.pitches) {
+            const key = Math.max(
+              0,
+              Math.min(127, pitchToMidi(pitch) + part.transpose),
+            )
+            events.push({
+              tick: local,
+              order: 1,
+              data: [0x90 | channel, key, VELOCITY],
+            })
+            events.push({
+              tick: local + durTick,
+              order: 0,
+              data: [0x80 | channel, key, 0],
+            })
+          }
         }
+        local += durTick
       }
-      local += durTick
     }
     measureStart += Math.round(measureCapacityWhole(curTime) * TICKS_PER_WHOLE)
   }

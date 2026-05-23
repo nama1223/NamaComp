@@ -8,7 +8,7 @@ import {
 import type { NoteElement, Score } from '../types/score'
 import type { Cursor } from '../types/editor'
 import type { MusicFontName } from '../render/fonts'
-import { VexRenderer } from '../render/VexRenderer'
+import { VexRenderer, type ClickTarget } from '../render/VexRenderer'
 
 interface StaffAreaProps {
   score: Score
@@ -20,7 +20,7 @@ interface StaffAreaProps {
   onCellClick: (
     partIndex: number,
     measureIndex: number,
-    elementIndex?: number,
+    target?: ClickTarget,
   ) => void
   eraser?: boolean
   playMeasure?: number | null
