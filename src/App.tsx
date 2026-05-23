@@ -3,6 +3,7 @@ import type { Clef, TimeSignature } from './types/score'
 import { useSettings } from './state/useSettings'
 import { useScore } from './state/useScore'
 import { useInputState } from './state/useInputState'
+import { usePlayback } from './state/usePlayback'
 import { ensureMusicFont, type MusicFontName } from './render/fonts'
 import { measureUsedWhole } from './model/score'
 import { durationToWholeFraction, wouldOverflow } from './model/duration'
@@ -17,6 +18,7 @@ export default function App() {
   const { settings, update } = useSettings()
   const score = useScore()
   const input = useInputState(settings.inputMethod)
+  const playback = usePlayback()
 
   const [activeFont, setActiveFont] = useState<MusicFontName>('Bravura')
   useEffect(() => {
@@ -89,9 +91,9 @@ export default function App() {
         <PlaybackDrawer
           tempo={score.score.tempo}
           onTempo={(tempo) => score.updateMeta({ tempo })}
-          isPlaying={false}
-          onPlay={() => console.info('[NamaComp] playback not yet implemented')}
-          onStop={() => undefined}
+          isPlaying={playback.isPlaying}
+          onPlay={() => playback.toggle(score.score)}
+          onStop={playback.stop}
         />
       ),
     },

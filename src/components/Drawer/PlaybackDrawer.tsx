@@ -32,8 +32,6 @@ export function PlaybackDrawer({
         <span className="tempo-val">{tempo}</span>
         <button onClick={() => onTempo(Math.min(300, tempo + 5))}>▶</button>
       </div>
-
-      <span className="drawer-hint">音声再生は次の更新で対応予定</span>
     </div>
   )
 }
