@@ -41,6 +41,21 @@ const VALUE_LABEL: Record<NoteValue, string> = {
   64: '64分',
 }
 
+// ── 音程: C1〜B7 の連続配列（クロスオクターブ対応） ──────────────────────────
+const OCT_MIN = 1
+const OCT_MAX = 7
+interface PitchItem {
+  step: Step
+  octave: number
+}
+const PITCH_ITEMS: PitchItem[] = []
+for (let oct = OCT_MIN; oct <= OCT_MAX; oct++) {
+  for (const step of STEPS) {
+    PITCH_ITEMS.push({ step, octave: oct })
+  }
+}
+// 49 items total (C1…B7)
+
 export function PickerRollInput({
   picker,
   patch,
@@ -48,39 +63,64 @@ export function PickerRollInput({
   onCommitRest,
   overflow,
 }: PickerRollInputProps) {
-  const stepIndex = STEPS.indexOf(picker.step)
+  // 音程インデックス: step + octave の両方から決定
+  const pitchIndex = Math.max(
+    0,
+    PITCH_ITEMS.findIndex(
+      (p) => p.step === picker.step && p.octave === picker.octave,
+    ),
+  )
   const valueIndex = NOTE_VALUES.indexOf(picker.value)
 
   return (
     <div className={`picker-roll ${overflow ? 'overflow' : ''}`}>
+      {/* ── 音程ホイール (クロスオクターブ / クランプ) ── */}
       <div className="picker-col pitch">
         <Wheel
-          items={STEPS}
-          index={stepIndex}
-          onIndex={(i) => patch({ step: STEPS[i] })}
-          wrap
-          render={(s) => (
+          items={PITCH_ITEMS}
+          index={pitchIndex}
+          onIndex={(i) =>
+            patch({ step: PITCH_ITEMS[i].step, octave: PITCH_ITEMS[i].octave })
+          }
+          wrap={false}
+          render={(p) => (
             <span>
-              {SOLFEGE[s]} {s}
+              {SOLFEGE[p.step]}
+              {p.octave}&thinsp;{p.step}
             </span>
           )}
         />
+        {/* オクターブ直接ジャンプ用ステッパー（ホイールと連動） */}
         <div className="octave">
-          <button onClick={() => patch({ octave: Math.max(0, picker.octave - 1) })}>
+          <button
+            onClick={() =>
+              patch({
+                octave: Math.max(OCT_MIN, picker.octave - 1),
+              })
+            }
+          >
             ▼
           </button>
           <span>Oct {picker.octave}</span>
-          <button onClick={() => patch({ octave: Math.min(8, picker.octave + 1) })}>
+          <button
+            onClick={() =>
+              patch({
+                octave: Math.min(OCT_MAX, picker.octave + 1),
+              })
+            }
+          >
             ▲
           </button>
         </div>
       </div>
 
+      {/* ── 音価ホイール (端同士ループ) ── */}
       <div className="picker-col length">
         <Wheel
           items={NOTE_VALUES}
           index={valueIndex}
           onIndex={(i) => patch({ value: NOTE_VALUES[i] })}
+          wrap /* 全音符 ↔ 64分音符 がループ */
           render={(v) => (
             <span>
               <span className="glyph">{VALUE_GLYPH[v]}</span> {VALUE_LABEL[v]}
@@ -89,14 +129,13 @@ export function PickerRollInput({
         />
       </div>
 
+      {/* ── 臨時記号 ── */}
       <div className="picker-col accidentals">
         <label className={`chk ${picker.sharp ? 'on' : ''}`}>
           <input
             type="checkbox"
             checked={picker.sharp}
-            onChange={(e) =>
-              patch({ sharp: e.target.checked, flat: false })
-            }
+            onChange={(e) => patch({ sharp: e.target.checked, flat: false })}
           />
           ♯
         </label>
@@ -104,14 +143,13 @@ export function PickerRollInput({
           <input
             type="checkbox"
             checked={picker.flat}
-            onChange={(e) =>
-              patch({ flat: e.target.checked, sharp: false })
-            }
+            onChange={(e) => patch({ flat: e.target.checked, sharp: false })}
           />
           ♭
         </label>
       </div>
 
+      {/* ── 付点 ── */}
       <div className="picker-col dots">
         <span className="dots-label">付点</span>
         <div className="dots-stepper">
@@ -125,6 +163,7 @@ export function PickerRollInput({
         </div>
       </div>
 
+      {/* ── 確定ボタン ── */}
       <div className="picker-col commit">
         <button className="commit-note" onClick={onCommitNote}>
           音符
