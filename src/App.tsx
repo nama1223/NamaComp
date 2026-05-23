@@ -24,7 +24,6 @@ import {
 import type { NoteElement, Score } from './types/score'
 import type { ClickTarget } from './render/VexRenderer'
 import { normalizeSelection } from './types/editor'
-import { Toolbar } from './components/Toolbar'
 import type { InstrumentPreset } from './model/instruments'
 import { midiToPitch } from './model/pitch'
 import {
@@ -43,6 +42,8 @@ import { InputArea } from './components/input/InputArea'
 import { DrawerRail, type DrawerDef } from './components/Drawer/DrawerRail'
 import { SymbolDrawer } from './components/Drawer/SymbolDrawer'
 import { MeasureDrawer } from './components/Drawer/MeasureDrawer'
+import { SelectionDrawer } from './components/Drawer/SelectionDrawer'
+import { ExpressionDrawer } from './components/Drawer/ExpressionDrawer'
 import { PlaybackDrawer } from './components/Drawer/PlaybackDrawer'
 import { ScoreManager } from './components/ScoreManager'
 
@@ -503,6 +504,31 @@ export default function App() {
       ),
     },
     {
+      id: 'selection',
+      label: '選択',
+      icon: '✂',
+      content: (
+        <SelectionDrawer
+          mode={input.mode}
+          onToggleSelect={toggleSelect}
+          hasSelection={input.selection !== null}
+          hasClipboard={!!input.clipboard && input.clipboard.length > 0}
+          onCopy={copySelection}
+          onCut={cutSelection}
+          onPaste={pasteClipboard}
+          onClearSelection={clearSelection}
+        />
+      ),
+    },
+    {
+      id: 'expression',
+      label: '表現',
+      icon: '＞',
+      content: (
+        <ExpressionDrawer onArticulate={articulate} onTie={toggleTie} />
+      ),
+    },
+    {
       id: 'playback',
       label: '再生',
       icon: '▶',
@@ -564,19 +590,6 @@ export default function App() {
         onToggleEraser={() =>
           input.setMode((m) => (m === 'eraser' ? 'normal' : 'eraser'))
         }
-      />
-
-      <Toolbar
-        mode={input.mode}
-        onToggleSelect={toggleSelect}
-        hasSelection={input.selection !== null}
-        hasClipboard={!!input.clipboard && input.clipboard.length > 0}
-        onCopy={copySelection}
-        onCut={cutSelection}
-        onPaste={pasteClipboard}
-        onClearSelection={clearSelection}
-        onArticulate={articulate}
-        onTie={toggleTie}
       />
 
       <StaffArea

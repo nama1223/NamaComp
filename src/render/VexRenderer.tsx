@@ -217,7 +217,7 @@ export function VexRenderer({
           if (playMeasure === measureIndex) {
             ctx.save()
             ctx.setFillStyle(HILITE_PLAY)
-            ctx.fillRect(x, y - 2, w, 64)
+            ctx.fillRect(x, y, w, STAVE_H)
             ctx.restore()
           }
 
@@ -228,7 +228,7 @@ export function VexRenderer({
           ) {
             ctx.save()
             ctx.setFillStyle(eraser ? HILITE_ERASE : HILITE)
-            ctx.fillRect(x, y - 2, w, 64)
+            ctx.fillRect(x, y, w, STAVE_H)
             ctx.restore()
           }
 
@@ -271,9 +271,9 @@ export function VexRenderer({
           // Cell-level hitbox (fallback / append target).
           hitboxRef.current.push({
             x,
-            y: y - 2,
+            y,
             w,
-            h: 64,
+            h: STAVE_H,
             partIndex: pi,
             measureIndex,
           })
@@ -281,9 +281,9 @@ export function VexRenderer({
           for (const h of elementHits) {
             hitboxRef.current.push({
               x: h.x,
-              y: y - 2,
+              y,
               w: h.w,
-              h: 64,
+              h: STAVE_H,
               partIndex: pi,
               measureIndex,
               voiceIndex: h.voiceIndex,
