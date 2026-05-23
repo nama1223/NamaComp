@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import type { NoteElement, NoteValue, Step } from '../types/score'
+import type { Duration, NoteElement, NoteValue, Step } from '../types/score'
 import type { Cursor, InputMethod } from '../types/editor'
 import { makeNote, makePitch, makeRest } from '../model/score'
 
@@ -10,6 +10,8 @@ export interface PickerState {
   dots: number
   sharp: boolean
   flat: boolean
+  /** Tuplet "actual" count: 0 = none, 3 = triplet, 5 = quintuplet, ... */
+  tuplet: number
 }
 
 const INITIAL_PICKER: PickerState = {
@@ -19,12 +21,20 @@ const INITIAL_PICKER: PickerState = {
   dots: 0,
   sharp: false,
   flat: false,
+  tuplet: 0,
 }
 
 const INITIAL_CURSOR: Cursor = {
   partIndex: 0,
   measureIndex: 0,
   elementIndex: 0,
+}
+
+/** Map a tuplet "actual" count to a {actual, normal} ratio (normal = pow2 below). */
+export function tupletRatio(actual: number): { actual: number; normal: number } {
+  let normal = 1
+  while (normal * 2 < actual) normal *= 2
+  return { actual, normal }
 }
 
 export function useInputState(initialMethod: InputMethod) {
@@ -39,6 +49,13 @@ export function useInputState(initialMethod: InputMethod) {
 
   const alter = picker.sharp ? 1 : picker.flat ? -1 : 0
 
+  // Current duration from the picker (value + dots + optional tuplet).
+  const buildDuration = useCallback((): Duration => {
+    const d: Duration = { value: picker.value, dots: picker.dots }
+    if (picker.tuplet > 0) d.tuplet = tupletRatio(picker.tuplet)
+    return d
+  }, [picker.value, picker.dots, picker.tuplet])
+
   // Stable-identity preview note (id is constant so renderer effects don't
   // thrash). Not inserted into the score; display only.
   const previewNote = useMemo<NoteElement>(
@@ -46,23 +63,20 @@ export function useInputState(initialMethod: InputMethod) {
       id: 'preview',
       kind: 'note',
       pitches: [makePitch(picker.step, picker.octave, alter)],
-      duration: { value: picker.value, dots: picker.dots },
+      duration: buildDuration(),
     }),
-    [picker.step, picker.octave, alter, picker.value, picker.dots],
+    [picker.step, picker.octave, alter, buildDuration],
   )
 
   const buildNote = useCallback(
     (): NoteElement =>
-      makeNote([makePitch(picker.step, picker.octave, alter)], {
-        value: picker.value,
-        dots: picker.dots,
-      }),
-    [picker.step, picker.octave, alter, picker.value, picker.dots],
+      makeNote([makePitch(picker.step, picker.octave, alter)], buildDuration()),
+    [picker.step, picker.octave, alter, buildDuration],
   )
 
   const buildRest = useCallback(
-    (): NoteElement => makeRest({ value: picker.value, dots: picker.dots }),
-    [picker.value, picker.dots],
+    (): NoteElement => makeRest(buildDuration()),
+    [buildDuration],
   )
 
   return {
@@ -77,5 +91,6 @@ export function useInputState(initialMethod: InputMethod) {
     previewNote,
     buildNote,
     buildRest,
+    buildDuration,
   }
 }

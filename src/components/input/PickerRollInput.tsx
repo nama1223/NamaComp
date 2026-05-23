@@ -42,6 +42,16 @@ const VALUE_LABEL: Record<NoteValue, string> = {
   64: '64分',
 }
 
+// Tuplet "actual" counts the user can cycle through (0 = none).
+const TUPLETS = [0, 3, 5, 6, 7]
+const TUPLET_LABEL: Record<number, string> = {
+  0: 'なし',
+  3: '3連符',
+  5: '5連符',
+  6: '6連符',
+  7: '7連符',
+}
+
 // ── 音程: C1〜B7 の連続配列（クロスオクターブ対応） ──────────────────────────
 const OCT_MIN = 1
 const OCT_MAX = 7
@@ -116,7 +126,7 @@ export function PickerRollInput({
         </div>
       </div>
 
-      {/* ── 音価ホイール (端同士ループ) ── */}
+      {/* ── 音価ホイール (端同士ループ) + 連符 ── */}
       <div className="picker-col length">
         <Wheel
           items={NOTE_VALUES}
@@ -130,6 +140,25 @@ export function PickerRollInput({
             </span>
           )}
         />
+        <div className="octave tuplet">
+          <button
+            onClick={() => {
+              const i = TUPLETS.indexOf(picker.tuplet)
+              patch({ tuplet: TUPLETS[(i - 1 + TUPLETS.length) % TUPLETS.length] })
+            }}
+          >
+            ◀
+          </button>
+          <span>{TUPLET_LABEL[picker.tuplet]}</span>
+          <button
+            onClick={() => {
+              const i = TUPLETS.indexOf(picker.tuplet)
+              patch({ tuplet: TUPLETS[(i + 1) % TUPLETS.length] })
+            }}
+          >
+            ▶
+          </button>
+        </div>
       </div>
 
       {/* ── 臨時記号 ── */}

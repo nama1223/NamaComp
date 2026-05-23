@@ -94,10 +94,7 @@ export default function App() {
     input.setCursor((c) => ({ ...c, elementIndex: c.elementIndex + 1 }))
   }
   function commitMidi(midi: number) {
-    const note = makeNote([midiToPitch(midi)], {
-      value: input.picker.value,
-      dots: input.picker.dots,
-    })
+    const note = makeNote([midiToPitch(midi)], input.buildDuration())
     score.insertAt(input.cursor, note)
     input.setCursor((c) => ({ ...c, elementIndex: c.elementIndex + 1 }))
   }

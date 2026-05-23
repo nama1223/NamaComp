@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Beam, Formatter, Renderer, Stave, StaveNote, Voice } from 'vexflow'
+import { Beam, Formatter, Renderer, Stave, StaveNote, Tuplet, Voice } from 'vexflow'
 import type { Measure, NoteElement, Part, Score } from '../types/score'
 import type { Cursor } from '../types/editor'
 import { makeRest } from '../model/score'
@@ -307,6 +307,41 @@ function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
   voice.setStrict(false)
   voice.addTickables(notes)
 
+  // Group consecutive committed notes that share a tuplet ratio. Constructed
+  // before formatting so the tuplet tick-scaling is taken into account.
+  const tuplets: Tuplet[] = []
+  {
+    const n = elements.length
+    let i = 0
+    while (i < n) {
+      const tup = elements[i].duration.tuplet
+      if (tup && notes[i]) {
+        let j = i + 1
+        while (
+          j < n &&
+          notes[j] &&
+          elements[j].duration.tuplet?.actual === tup.actual &&
+          elements[j].duration.tuplet?.normal === tup.normal
+        ) {
+          j++
+        }
+        try {
+          tuplets.push(
+            new Tuplet(notes.slice(i, j), {
+              numNotes: tup.actual,
+              notesOccupied: tup.normal,
+            }),
+          )
+        } catch {
+          /* ignore a malformed tuplet group */
+        }
+        i = j
+      } else {
+        i++
+      }
+    }
+  }
+
   const noteAreaPad = isFirst ? 90 : 22
   const noteAreaWidth = Math.max(60, stave.getWidth() - noteAreaPad)
 
@@ -326,6 +361,9 @@ function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
   voice.draw(ctx, stave)
   for (const beam of beams) {
     beam.setContext(ctx).draw()
+  }
+  for (const t of tuplets) {
+    t.setContext(ctx).draw()
   }
 
   // After formatting, the first `elements.length` notes correspond 1:1 to the
