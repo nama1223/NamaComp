@@ -71,6 +71,36 @@ export function measureStartTimes(score: Score): number[] {
   return starts
 }
 
+/** Schedule one triangle-osc note with a short ADSR onto any audio context.
+ *  Shared by live playback (Player) and offline rendering (renderScore). */
+export function scheduleNote(
+  ctx: BaseAudioContext,
+  dest: AudioNode,
+  ev: PlayEvent,
+  start: number,
+): void {
+  const t0 = start + ev.time
+  const t1 = t0 + ev.dur
+
+  const osc = ctx.createOscillator()
+  osc.type = 'triangle'
+  osc.frequency.value = ev.freq
+
+  const gain = ctx.createGain()
+  const peak = 0.32
+  const attack = 0.008
+  const release = Math.min(0.12, ev.dur * 0.4)
+  gain.gain.setValueAtTime(0, t0)
+  gain.gain.linearRampToValueAtTime(peak, t0 + attack)
+  gain.gain.setValueAtTime(peak, Math.max(t0 + attack, t1 - release))
+  gain.gain.linearRampToValueAtTime(0, t1)
+
+  osc.connect(gain)
+  gain.connect(dest)
+  osc.start(t0)
+  osc.stop(t1 + 0.02)
+}
+
 export class Player {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
@@ -106,7 +136,7 @@ export class Player {
     const start = ctx.currentTime + 0.06
     this.startAt = start
     for (const ev of events) {
-      this.scheduleNote(ctx, master, ev, start)
+      scheduleNote(ctx, master, ev, start)
     }
 
     this.endTimer = setTimeout(
@@ -116,34 +146,6 @@ export class Player {
       },
       (total + 0.4) * 1000,
     )
-  }
-
-  private scheduleNote(
-    ctx: AudioContext,
-    dest: GainNode,
-    ev: PlayEvent,
-    start: number,
-  ): void {
-    const t0 = start + ev.time
-    const t1 = t0 + ev.dur
-
-    const osc = ctx.createOscillator()
-    osc.type = 'triangle'
-    osc.frequency.value = ev.freq
-
-    const gain = ctx.createGain()
-    const peak = 0.32
-    const attack = 0.008
-    const release = Math.min(0.12, ev.dur * 0.4)
-    gain.gain.setValueAtTime(0, t0)
-    gain.gain.linearRampToValueAtTime(peak, t0 + attack)
-    gain.gain.setValueAtTime(peak, Math.max(t0 + attack, t1 - release))
-    gain.gain.linearRampToValueAtTime(0, t1)
-
-    osc.connect(gain)
-    gain.connect(dest)
-    osc.start(t0)
-    osc.stop(t1 + 0.02)
   }
 
   stop(): void {

@@ -12,6 +12,9 @@ interface TopBarProps {
   onNewScore: () => void
   onExportXML: () => void
   onExportMIDI: () => void
+  onExportWav: () => void
+  onExportMp3: () => void
+  audioBusy: boolean
   onImportXML: () => void
   onOpenManager: () => void
   onUndo: () => void
@@ -34,6 +37,9 @@ export function TopBar({
   onNewScore,
   onExportXML,
   onExportMIDI,
+  onExportWav,
+  onExportMp3,
+  audioBusy,
   onImportXML,
   onOpenManager,
   onUndo,
@@ -164,6 +170,24 @@ export function TopBar({
               }}
             >
               MIDI書き出し
+            </button>
+            <button
+              disabled={audioBusy}
+              onClick={() => {
+                onExportWav()
+                setMenuOpen(false)
+              }}
+            >
+              WAV書き出し{audioBusy ? '…' : ''}
+            </button>
+            <button
+              disabled={audioBusy}
+              onClick={() => {
+                onExportMp3()
+                setMenuOpen(false)
+              }}
+            >
+              mp3書き出し{audioBusy ? '…' : ''}
             </button>
             <button onClick={onToggleTheme}>
               テーマ: {theme === 'light' ? 'ライト' : 'ダーク'}

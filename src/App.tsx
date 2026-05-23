@@ -25,6 +25,8 @@ import {
 import type { NoteElement } from './types/score'
 import { exportMusicXML, importMusicXML } from './io/musicxml'
 import { exportMIDI } from './io/midi'
+import { renderScore } from './audio/render'
+import { encodeWav, encodeMp3 } from './audio/encode'
 import { downloadText, downloadBytes } from './io/download'
 import { TopBar } from './components/TopBar'
 import { StaffArea } from './components/StaffArea'
@@ -207,6 +209,25 @@ export default function App() {
     downloadBytes(`${safeName()}.mid`, bytes, 'audio/midi')
   }
 
+  const [rendering, setRendering] = useState(false)
+  async function exportAudio(kind: 'wav' | 'mp3') {
+    if (rendering) return
+    setRendering(true)
+    try {
+      const buffer = await renderScore(score.score)
+      if (kind === 'wav') {
+        downloadBytes(`${safeName()}.wav`, encodeWav(buffer), 'audio/wav')
+      } else {
+        downloadBytes(`${safeName()}.mp3`, encodeMp3(buffer), 'audio/mpeg')
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      alert(`音声の書き出しに失敗しました: ${msg}`)
+    } finally {
+      setRendering(false)
+    }
+  }
+
   function importXML(file: File) {
     file
       .text()
@@ -304,6 +325,9 @@ export default function App() {
         }}
         onExportXML={exportXML}
         onExportMIDI={exportMidi}
+        onExportWav={() => exportAudio('wav')}
+        onExportMp3={() => exportAudio('mp3')}
+        audioBusy={rendering}
         onImportXML={() => fileInputRef.current?.click()}
         onOpenManager={() => setShowManager(true)}
         onUndo={score.undo}
