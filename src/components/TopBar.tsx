@@ -10,6 +10,10 @@ interface TopBarProps {
   musicFont: MusicFontName
   onSetFont: (f: MusicFontName) => void
   onNewScore: () => void
+  onUndo: () => void
+  onRedo: () => void
+  canUndo: boolean
+  canRedo: boolean
 }
 
 const FONTS: MusicFontName[] = ['Bravura', 'Leland', 'Petaluma']
@@ -22,6 +26,10 @@ export function TopBar({
   musicFont,
   onSetFont,
   onNewScore,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
 }: TopBarProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -71,6 +79,25 @@ export function TopBar({
             {fileName}
           </button>
         )}
+      </div>
+
+      <div className="topbar-actions">
+        <button
+          className="icon-btn"
+          aria-label="元に戻す"
+          disabled={!canUndo}
+          onClick={onUndo}
+        >
+          ↩
+        </button>
+        <button
+          className="icon-btn"
+          aria-label="やり直し"
+          disabled={!canRedo}
+          onClick={onRedo}
+        >
+          ↪
+        </button>
       </div>
 
       {menuOpen && (

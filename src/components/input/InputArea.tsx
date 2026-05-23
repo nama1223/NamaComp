@@ -10,10 +10,6 @@ interface InputAreaProps {
   patch: (p: Partial<PickerState>) => void
   onCommitNote: () => void
   onCommitRest: () => void
-  onUndo: () => void
-  onRedo: () => void
-  canUndo: boolean
-  canRedo: boolean
   overflow: boolean
 }
 
@@ -37,10 +33,6 @@ export function InputArea(props: InputAreaProps) {
             patch={props.patch}
             onCommitNote={props.onCommitNote}
             onCommitRest={props.onCommitRest}
-            onUndo={props.onUndo}
-            onRedo={props.onRedo}
-            canUndo={props.canUndo}
-            canRedo={props.canRedo}
             overflow={props.overflow}
           />
         ) : (

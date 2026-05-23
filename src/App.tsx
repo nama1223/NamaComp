@@ -112,6 +112,10 @@ export default function App() {
           score.resetScore()
           input.setCursor({ partIndex: 0, measureIndex: 0, elementIndex: 0 })
         }}
+        onUndo={score.undo}
+        onRedo={score.redo}
+        canUndo={score.canUndo}
+        canRedo={score.canRedo}
       />
 
       <StaffArea
@@ -134,10 +138,6 @@ export default function App() {
         patch={input.patchPicker}
         onCommitNote={commitNote}
         onCommitRest={commitRest}
-        onUndo={score.undo}
-        onRedo={score.redo}
-        canUndo={score.canUndo}
-        canRedo={score.canRedo}
         overflow={input.method === 'picker' && previewOverflow}
       />
     </div>

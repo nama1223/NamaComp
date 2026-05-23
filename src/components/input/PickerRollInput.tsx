@@ -8,10 +8,6 @@ interface PickerRollInputProps {
   patch: (p: Partial<PickerState>) => void
   onCommitNote: () => void
   onCommitRest: () => void
-  onUndo: () => void
-  onRedo: () => void
-  canUndo: boolean
-  canRedo: boolean
   overflow: boolean
 }
 
@@ -50,10 +46,6 @@ export function PickerRollInput({
   patch,
   onCommitNote,
   onCommitRest,
-  onUndo,
-  onRedo,
-  canUndo,
-  canRedo,
   overflow,
 }: PickerRollInputProps) {
   const stepIndex = STEPS.indexOf(picker.step)
@@ -61,25 +53,6 @@ export function PickerRollInput({
 
   return (
     <div className={`picker-roll ${overflow ? 'overflow' : ''}`}>
-      <div className="picker-col history">
-        <button
-          className="hist-btn"
-          aria-label="元に戻す"
-          disabled={!canUndo}
-          onClick={onUndo}
-        >
-          ↩
-        </button>
-        <button
-          className="hist-btn"
-          aria-label="やり直し"
-          disabled={!canRedo}
-          onClick={onRedo}
-        >
-          ↪
-        </button>
-      </div>
-
       <div className="picker-col pitch">
         <Wheel
           items={STEPS}
