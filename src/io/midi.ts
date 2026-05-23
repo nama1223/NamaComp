@@ -75,8 +75,9 @@ function buildPartTrack(part: Part, channelIndex: number, score: Score): number[
   const events: MidiEvent[] = []
 
   let measureStart = 0
+  let curTime = score.time
   for (const measure of part.measures) {
-    const time = measure.time ?? score.time
+    if (measure.time) curTime = measure.time
     let local = measureStart
     for (const el of measure.elements) {
       const durTick = Math.round(
@@ -102,7 +103,7 @@ function buildPartTrack(part: Part, channelIndex: number, score: Score): number[
       }
       local += durTick
     }
-    measureStart += Math.round(measureCapacityWhole(time) * TICKS_PER_WHOLE)
+    measureStart += Math.round(measureCapacityWhole(curTime) * TICKS_PER_WHOLE)
   }
 
   events.sort((a, b) => a.tick - b.tick || a.order - b.order)

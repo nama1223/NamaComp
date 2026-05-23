@@ -22,11 +22,13 @@ export function scoreToEvents(score: Score): { events: PlayEvent[]; total: numbe
 
   for (const part of score.parts) {
     // Measure-aligned: each measure starts at its boundary so parts stay in
-    // sync even when a bar isn't completely filled.
+    // sync even when a bar isn't completely filled. A time-signature override
+    // persists from its measure onward (matches the renderer).
     let measureStart = 0
+    let curTime = score.time
     for (const measure of part.measures) {
-      const time = measure.time ?? score.time
-      const measureSec = measureCapacityWhole(time) * secPerWhole
+      if (measure.time) curTime = measure.time
+      const measureSec = measureCapacityWhole(curTime) * secPerWhole
 
       let local = measureStart
       for (const el of measure.elements) {
@@ -60,10 +62,11 @@ export function measureStartTimes(score: Score): number[] {
   )
   const starts: number[] = []
   let t = 0
+  let curTime = score.time
   for (let i = 0; i < count; i++) {
+    if (longest.measures[i]?.time) curTime = longest.measures[i]!.time!
     starts.push(t)
-    const time = longest.measures[i]?.time ?? score.time
-    t += measureCapacityWhole(time) * secPerWhole
+    t += measureCapacityWhole(curTime) * secPerWhole
   }
   return starts
 }

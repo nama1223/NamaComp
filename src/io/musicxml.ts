@@ -129,6 +129,11 @@ function alterToAccidental(alter: number): AccidentalKind | null {
   }
 }
 
+function clefXmlOf(clef: Clef): string {
+  const c = CLEF_TO_XML[clef]
+  return `<clef><sign>${c.sign}</sign>${c.line ? `<line>${c.line}</line>` : ''}</clef>`
+}
+
 function measureToXml(
   measure: Measure,
   index: number,
@@ -136,20 +141,35 @@ function measureToXml(
   score: Score,
 ): string {
   const number = index + 1
-  let attributes = ''
+
+  // Sub-elements in MusicXML attribute order: divisions, key, time, clef.
+  let inner = ''
   if (index === 0) {
-    const c = CLEF_TO_XML[part.clef]
-    const clefXml = `<clef><sign>${c.sign}</sign>${c.line ? `<line>${c.line}</line>` : ''}</clef>`
+    // First measure: emit the full baseline (effective values).
+    const key = measure.keyFifths ?? score.keyFifths
+    const time = measure.time ?? score.time
+    const clef = measure.clef ?? part.clef
     const transposeXml =
       part.transpose !== 0
         ? `<transpose><chromatic>${part.transpose}</chromatic></transpose>`
         : ''
-    attributes =
-      `<attributes><divisions>${DIVISIONS}</divisions>` +
-      `<key><fifths>${score.keyFifths}</fifths></key>` +
-      `<time><beats>${score.time.beats}</beats><beat-type>${score.time.beatType}</beat-type></time>` +
-      `${clefXml}${transposeXml}</attributes>`
+    inner =
+      `<divisions>${DIVISIONS}</divisions>` +
+      `<key><fifths>${key}</fifths></key>` +
+      `<time><beats>${time.beats}</beats><beat-type>${time.beatType}</beat-type></time>` +
+      `${clefXmlOf(clef)}${transposeXml}`
+  } else {
+    // Later measures: only emit what changes here (mid-piece overrides).
+    if (measure.keyFifths !== undefined) {
+      inner += `<key><fifths>${measure.keyFifths}</fifths></key>`
+    }
+    if (measure.time) {
+      inner += `<time><beats>${measure.time.beats}</beats><beat-type>${measure.time.beatType}</beat-type></time>`
+    }
+    if (measure.clef) inner += clefXmlOf(measure.clef)
   }
+
+  const attributes = inner ? `<attributes>${inner}</attributes>` : ''
   const notes = measure.elements.map((el) => noteToXml(el, part.clef)).join('')
   return `<measure number="${number}">${attributes}${notes}</measure>`
 }
@@ -271,24 +291,67 @@ export function importMusicXML(xml: string): Score {
     let transpose = 0
     const measures: Measure[] = []
 
+    // Running effective values so attribute changes after measure 0 become
+    // per-measure overrides (mid-piece clef/key/time).
+    let runClef: Clef = 'treble'
+    let runKey = base.keyFifths
+    let runTime = base.time
+
     partEl.querySelectorAll('measure').forEach((measureEl, mIndex) => {
       const attr = measureEl.querySelector('attributes')
+      let mClef: Clef | undefined
+      let mKey: number | undefined
+      let mTime: { beats: number; beatType: number } | undefined
+
       if (attr) {
         const clefEl = attr.querySelector('clef')
+        let parsedClef: Clef | undefined
         if (clefEl) {
           const sign = textOf(clefEl, 'sign') ?? 'G'
           const lineText = textOf(clefEl, 'line')
-          clef = xmlToClef(sign, lineText ? Number(lineText) : undefined)
+          parsedClef = xmlToClef(sign, lineText ? Number(lineText) : undefined)
         }
         const chromatic = textOf(attr, 'transpose chromatic')
         if (chromatic) transpose = Number(chromatic)
-        if (mIndex === 0 && pIndex === 0) {
-          const fifths = textOf(attr, 'key fifths')
-          if (fifths) scoreKeyFifths = Number(fifths)
-          const beats = textOf(attr, 'time beats')
-          const beatType = textOf(attr, 'time beat-type')
-          if (beats && beatType) {
-            scoreTime = { beats: Number(beats), beatType: Number(beatType) }
+
+        const fifthsText = textOf(attr, 'key fifths')
+        const parsedKey = fifthsText !== null ? Number(fifthsText) : undefined
+        const beats = textOf(attr, 'time beats')
+        const beatType = textOf(attr, 'time beat-type')
+        const parsedTime =
+          beats && beatType
+            ? { beats: Number(beats), beatType: Number(beatType) }
+            : undefined
+
+        if (mIndex === 0) {
+          if (parsedClef) {
+            clef = parsedClef
+            runClef = parsedClef
+          }
+          if (parsedKey !== undefined) {
+            runKey = parsedKey
+            if (pIndex === 0) scoreKeyFifths = parsedKey
+          }
+          if (parsedTime) {
+            runTime = parsedTime
+            if (pIndex === 0) scoreTime = parsedTime
+          }
+        } else {
+          if (parsedClef && parsedClef !== runClef) {
+            mClef = parsedClef
+            runClef = parsedClef
+          }
+          if (parsedKey !== undefined && parsedKey !== runKey) {
+            mKey = parsedKey
+            runKey = parsedKey
+          }
+          if (
+            parsedTime &&
+            (parsedTime.beats !== runTime.beats ||
+              parsedTime.beatType !== runTime.beatType)
+          ) {
+            mTime = parsedTime
+            runTime = parsedTime
           }
         }
       }
@@ -308,7 +371,13 @@ export function importMusicXML(xml: string): Score {
         }
       })
 
-      measures.push({ id: uid(), elements })
+      measures.push({
+        id: uid(),
+        elements,
+        ...(mClef ? { clef: mClef } : {}),
+        ...(mKey !== undefined ? { keyFifths: mKey } : {}),
+        ...(mTime ? { time: mTime } : {}),
+      })
     })
 
     parts.push({
