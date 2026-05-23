@@ -1,0 +1,140 @@
+// Score construction + immutable edit operations. All edit helpers return a new
+// Score (structural sharing where convenient) so React state updates stay clean.
+
+import type {
+  Clef,
+  Duration,
+  Measure,
+  NoteElement,
+  Part,
+  Pitch,
+  Score,
+  Step,
+} from '../types/score'
+import { durationToWholeFraction } from './duration'
+
+export function uid(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID()
+  }
+  return 'id-' + Math.random().toString(36).slice(2, 10)
+}
+
+export function makePitch(step: Step, octave: number, alter = 0): Pitch {
+  return { step, octave, alter }
+}
+
+export function makeNote(pitches: Pitch[], duration: Duration): NoteElement {
+  return { id: uid(), kind: 'note', pitches, duration }
+}
+
+export function makeRest(duration: Duration): NoteElement {
+  return { id: uid(), kind: 'rest', pitches: [], duration }
+}
+
+function emptyMeasure(): Measure {
+  return { id: uid(), elements: [] }
+}
+
+function makePart(
+  name: string,
+  fullName: string,
+  clef: Clef,
+  transpose: number,
+  measureCount: number,
+): Part {
+  return {
+    id: uid(),
+    name,
+    fullName,
+    clef,
+    transpose,
+    measures: Array.from({ length: measureCount }, emptyMeasure),
+  }
+}
+
+/** Default 3-part score mirroring the mockup (Trp / Horn / Tuba). */
+export function createDefaultScore(): Score {
+  const MEASURES = 4
+  return {
+    title: '無題のスコア',
+    fileName: 'ファイル名',
+    keyFifths: 0,
+    time: { beats: 4, beatType: 4 },
+    tempo: 100,
+    parts: [
+      makePart('Trp', 'Trumpet in B♭', 'treble', -2, MEASURES),
+      makePart('Horn', 'Horn in F', 'treble', -7, MEASURES),
+      makePart('Tuba', 'Tuba', 'bass', 0, MEASURES),
+    ],
+  }
+}
+
+// --- whole-note fraction helpers -------------------------------------------
+
+export function measureUsedWhole(measure: Measure): number {
+  return measure.elements.reduce(
+    (sum, el) => sum + durationToWholeFraction(el.duration),
+    0,
+  )
+}
+
+// --- immutable edit ops -----------------------------------------------------
+
+function replaceMeasure(
+  score: Score,
+  partIndex: number,
+  measureIndex: number,
+  updater: (m: Measure) => Measure,
+): Score {
+  const parts = score.parts.map((part, pi) => {
+    if (pi !== partIndex) return part
+    const measures = part.measures.map((m, mi) =>
+      mi === measureIndex ? updater(m) : m,
+    )
+    return { ...part, measures }
+  })
+  return { ...score, parts }
+}
+
+export function insertElement(
+  score: Score,
+  partIndex: number,
+  measureIndex: number,
+  elementIndex: number,
+  element: NoteElement,
+): Score {
+  return replaceMeasure(score, partIndex, measureIndex, (m) => {
+    const elements = [...m.elements]
+    const at = Math.max(0, Math.min(elementIndex, elements.length))
+    elements.splice(at, 0, element)
+    return { ...m, elements }
+  })
+}
+
+export function deleteElement(
+  score: Score,
+  partIndex: number,
+  measureIndex: number,
+  elementIndex: number,
+): Score {
+  return replaceMeasure(score, partIndex, measureIndex, (m) => {
+    const elements = m.elements.filter((_, i) => i !== elementIndex)
+    return { ...m, elements }
+  })
+}
+
+export function setScoreMeta(score: Score, patch: Partial<Score>): Score {
+  return { ...score, ...patch }
+}
+
+export function updatePart(
+  score: Score,
+  partIndex: number,
+  patch: Partial<Part>,
+): Score {
+  const parts = score.parts.map((p, i) =>
+    i === partIndex ? { ...p, ...patch } : p,
+  )
+  return { ...score, parts }
+}
