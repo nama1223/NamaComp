@@ -5,7 +5,8 @@ import { useScore } from './state/useScore'
 import { useInputState } from './state/useInputState'
 import { usePlayback } from './state/usePlayback'
 import { ensureMusicFont, type MusicFontName } from './render/fonts'
-import { measureUsedWhole } from './model/score'
+import { makeNote, measureUsedWhole } from './model/score'
+import { midiToPitch } from './model/pitch'
 import { durationToWholeFraction, wouldOverflow } from './model/duration'
 import { exportMusicXML, importMusicXML } from './io/musicxml'
 import { downloadText } from './io/download'
@@ -62,6 +63,14 @@ export default function App() {
   }
   function commitRest() {
     score.insertAt(input.cursor, input.buildRest())
+    input.setCursor((c) => ({ ...c, elementIndex: c.elementIndex + 1 }))
+  }
+  function commitMidi(midi: number) {
+    const note = makeNote([midiToPitch(midi)], {
+      value: input.picker.value,
+      dots: input.picker.dots,
+    })
+    score.insertAt(input.cursor, note)
     input.setCursor((c) => ({ ...c, elementIndex: c.elementIndex + 1 }))
   }
 
@@ -176,7 +185,8 @@ export default function App() {
         patch={input.patchPicker}
         onCommitNote={commitNote}
         onCommitRest={commitRest}
-        overflow={input.method === 'picker' && previewOverflow}
+        onCommitMidi={commitMidi}
+        overflow={previewOverflow}
       />
     </div>
   )

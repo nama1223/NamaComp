@@ -10,6 +10,7 @@ interface InputAreaProps {
   patch: (p: Partial<PickerState>) => void
   onCommitNote: () => void
   onCommitRest: () => void
+  onCommitMidi: (midi: number) => void
   overflow: boolean
 }
 
@@ -36,7 +37,12 @@ export function InputArea(props: InputAreaProps) {
             overflow={props.overflow}
           />
         ) : (
-          <KeyboardInput />
+          <KeyboardInput
+            picker={props.picker}
+            patch={props.patch}
+            onCommitMidi={props.onCommitMidi}
+            overflow={props.overflow}
+          />
         )}
       </div>
 

@@ -3,26 +3,9 @@
 // measure-aligned so multiple parts stay in sync even when a measure isn't
 // completely filled with notes.
 
-import type { Pitch, Score } from '../types/score'
+import type { Score } from '../types/score'
 import { durationToWholeFraction, measureCapacityWhole } from '../model/duration'
-
-const STEP_SEMITONE: Record<string, number> = {
-  C: 0,
-  D: 2,
-  E: 4,
-  F: 5,
-  G: 7,
-  A: 9,
-  B: 11,
-}
-
-function pitchToMidi(p: Pitch): number {
-  return (p.octave + 1) * 12 + STEP_SEMITONE[p.step] + p.alter
-}
-
-function midiToFreq(midi: number): number {
-  return 440 * Math.pow(2, (midi - 69) / 12)
-}
+import { midiToFreq, pitchToMidi } from '../model/pitch'
 
 export interface PlayEvent {
   /** Seconds from playback start. */

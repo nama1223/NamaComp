@@ -556,34 +556,107 @@ button {
 .kbd-input {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  padding: 8px 10px;
+}
+.kbd-input.overflow {
+  background: rgba(226, 59, 59, 0.08);
+}
+.kbd-controls {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  height: 100%;
-  padding: 12px;
+  gap: 8px 14px;
 }
-.kbd-transpose {
+.kbd-lens {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
+  gap: 4px;
 }
-.kbd-transpose button {
-  width: 40px;
-  height: 40px;
+.kbd-lens button {
+  width: 34px;
+  height: 34px;
   border: 1px solid var(--border);
   background: var(--panel-2);
   border-radius: 8px;
+  font-weight: 700;
 }
-.kbd-transpose-val {
-  min-width: 40px;
+.kbd-lens button.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.kbd-step {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+}
+.kbd-step button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  border-radius: 6px;
+}
+.kbd-num {
+  min-width: 26px;
   text-align: center;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
-.kbd-note {
-  color: var(--fg-dim);
-  font-size: 13px;
+.kbd-piano {
+  position: relative;
+  flex: 1;
+  min-height: 96px;
+  display: flex;
+  gap: 2px;
+  touch-action: manipulation;
+}
+.wkey {
+  position: relative;
+  height: 100%;
+  background: #fdfdfd;
+  border: 1px solid #8a8a8a;
+  border-radius: 0 0 6px 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 2px;
+  padding-bottom: 6px;
+  color: #222;
+}
+.wkey:active {
+  background: var(--accent-soft);
+}
+.wkey-sol {
+  font-size: 11px;
+  color: #888;
+}
+.wkey-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+.bkey {
+  position: absolute;
+  top: 0;
+  width: 11%;
+  height: 60%;
+  background: #232323;
+  color: #fff;
+  border: 1px solid #000;
+  border-radius: 0 0 5px 5px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 5px;
+  font-size: 10px;
+  z-index: 2;
+}
+.bkey:active {
+  background: var(--accent);
 }
 
 /* --- Tablet / desktop ---------------------------------------------------- */
