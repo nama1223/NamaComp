@@ -9,7 +9,8 @@ import { makeNote, measureUsedWhole } from './model/score'
 import { midiToPitch } from './model/pitch'
 import { durationToWholeFraction, wouldOverflow } from './model/duration'
 import { exportMusicXML, importMusicXML } from './io/musicxml'
-import { downloadText } from './io/download'
+import { exportMIDI } from './io/midi'
+import { downloadText, downloadBytes } from './io/download'
 import { TopBar } from './components/TopBar'
 import { StaffArea } from './components/StaffArea'
 import { InputArea } from './components/input/InputArea'
@@ -129,10 +130,22 @@ export default function App() {
     }))
   }
 
+  function safeName() {
+    return score.score.fileName.replace(/[\\/:*?"<>|]/g, '_') || 'score'
+  }
+
   function exportXML() {
     const xml = exportMusicXML(score.score)
-    const safe = score.score.fileName.replace(/[\\/:*?"<>|]/g, '_') || 'score'
-    downloadText(`${safe}.musicxml`, xml, 'application/vnd.recordare.musicxml+xml')
+    downloadText(
+      `${safeName()}.musicxml`,
+      xml,
+      'application/vnd.recordare.musicxml+xml',
+    )
+  }
+
+  function exportMidi() {
+    const bytes = exportMIDI(score.score)
+    downloadBytes(`${safeName()}.mid`, bytes, 'audio/midi')
   }
 
   function importXML(file: File) {
@@ -221,6 +234,7 @@ export default function App() {
           input.setCursor({ partIndex: 0, measureIndex: 0, elementIndex: 0 })
         }}
         onExportXML={exportXML}
+        onExportMIDI={exportMidi}
         onImportXML={() => fileInputRef.current?.click()}
         onUndo={score.undo}
         onRedo={score.redo}

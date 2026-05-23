@@ -11,6 +11,7 @@ interface TopBarProps {
   onSetFont: (f: MusicFontName) => void
   onNewScore: () => void
   onExportXML: () => void
+  onExportMIDI: () => void
   onImportXML: () => void
   onUndo: () => void
   onRedo: () => void
@@ -31,6 +32,7 @@ export function TopBar({
   onSetFont,
   onNewScore,
   onExportXML,
+  onExportMIDI,
   onImportXML,
   onUndo,
   onRedo,
@@ -144,6 +146,14 @@ export function TopBar({
               }}
             >
               MusicXML書き出し
+            </button>
+            <button
+              onClick={() => {
+                onExportMIDI()
+                setMenuOpen(false)
+              }}
+            >
+              MIDI書き出し
             </button>
             <button onClick={onToggleTheme}>
               テーマ: {theme === 'light' ? 'ライト' : 'ダーク'}
