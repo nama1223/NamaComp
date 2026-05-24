@@ -1,6 +1,6 @@
-// Off-screen, paginated renderer used for PDF export. Reuses drawMeasure from
-// the on-screen renderer but lays the score into fixed-size pages (A4 ratio)
-// with no cursor / preview / interactivity.
+// Off-screen, paginated renderer for PDF / print preview. Renders each page to
+// a Canvas (so the music font glyphs are rasterised correctly — svg2pdf cannot
+// embed the SMuFL font). Reuses drawMeasure from the on-screen renderer.
 
 import { Renderer, Stave } from 'vexflow'
 import type { Clef, Score, TimeSignature } from '../types/score'
@@ -16,9 +16,11 @@ const MEASURE_W = 220
 const FIRST_EXTRA = 70
 const RIGHT_MARGIN = 16
 
-// Page pixels (A4 portrait ratio ≈ 1.414). svg2pdf scales these to the page.
+// Page pixels (A4 portrait ratio ≈ 1.414).
 export const PAGE_W = 770
 export const PAGE_H = 1089
+// Super-sampling for crisp output.
+const SCALE = 2
 
 const KEY_NAMES = [
   'Cb', 'Gb', 'Db', 'Ab', 'Eb', 'Bb', 'F',
@@ -34,8 +36,8 @@ const NO_CURSOR = {
   elementIndex: 0,
 }
 
-/** Render the whole score into one detached SVG element per page. */
-export function renderScorePages(score: Score): SVGSVGElement[] {
+/** Render the whole score into one Canvas per page. */
+export function renderScorePages(score: Score): HTMLCanvasElement[] {
   const parts = score.parts
   if (parts.length === 0) return []
 
@@ -96,7 +98,6 @@ export function renderScorePages(score: Score): SVGSVGElement[] {
   }
   const effTempo = tempoTimeline(score)
 
-  // Variable measure widths (max of base and content-min).
   const colNoteW: number[] = []
   for (let mi = 0; mi < totalMeasures; mi++) {
     let maxTick = 1
@@ -108,7 +109,6 @@ export function renderScorePages(score: Score): SVGSVGElement[] {
     colNoteW.push(Math.max(MEASURE_W, 30 + maxTick * 30))
   }
 
-  // Pack measures into systems by accumulated width.
   const systems: number[][] = []
   {
     let row: number[] = []
@@ -131,99 +131,83 @@ export function renderScorePages(score: Score): SVGSVGElement[] {
   const systemHeight = parts.length * STAVE_H + SYSTEM_GAP
   const sysPerPage = Math.max(1, Math.floor((PAGE_H - TOP_PAD) / systemHeight))
 
-  const host = document.createElement('div')
-  host.style.cssText = 'position:absolute;left:-99999px;top:0;'
-  document.body.appendChild(host)
+  const canvases: HTMLCanvasElement[] = []
+  for (let pStart = 0; pStart < systems.length; pStart += sysPerPage) {
+    const pageSystems = systems.slice(pStart, pStart + sysPerPage)
+    const canvas = document.createElement('canvas')
+    canvas.width = PAGE_W * SCALE
+    canvas.height = PAGE_H * SCALE
+    const renderer = new Renderer(canvas, Renderer.Backends.CANVAS)
+    const ctx = renderer.getContext()
+    ctx.scale(SCALE, SCALE)
+    // White page background.
+    ctx.save()
+    ctx.setFillStyle('#ffffff')
+    ctx.fillRect(0, 0, PAGE_W, PAGE_H)
+    ctx.restore()
 
-  const svgs: SVGSVGElement[] = []
-  try {
-    for (let pStart = 0; pStart < systems.length; pStart += sysPerPage) {
-      const pageSystems = systems.slice(pStart, pStart + sysPerPage)
-      const div = document.createElement('div')
-      host.appendChild(div)
-      const renderer = new Renderer(div, Renderer.Backends.SVG)
-      renderer.resize(PAGE_W, PAGE_H)
-      const ctx = renderer.getContext()
-
-      pageSystems.forEach((row, sIdx) => {
-        const systemTop = TOP_PAD + sIdx * systemHeight
-        let x = LABEL_W + LEFT_PAD
-        for (let col = 0; col < row.length; col++) {
-          const measureIndex = row[col]
-          const isFirst = col === 0
-          const w = colNoteW[measureIndex] + (isFirst ? FIRST_EXTRA : 0)
-          for (let pi = 0; pi < parts.length; pi++) {
-            const part = parts[pi]
-            const measure = part.measures[measureIndex]
-            const y = systemTop + pi * STAVE_H
-            const eClef = effClef[pi][measureIndex]
-            const eKey = effKey[pi][measureIndex]
-            const eTime = effTime[pi][measureIndex]
-            const stave = new Stave(x, y, w)
-            if (isFirst || clefChange[pi][measureIndex]) stave.addClef(eClef)
-            if (isFirst || keyChange[pi][measureIndex]) {
-              stave.addKeySignature(keyName(eKey))
-            }
-            if (isFirst || timeChange[pi][measureIndex]) {
-              stave.addTimeSignature(`${eTime.beats}/${eTime.beatType}`)
-            }
-            stave.setContext(ctx).draw()
-            if (isFirst) {
-              ctx.save()
-              ctx.setFont('Arial', 12, 'bold')
-              ctx.fillText(part.name, LEFT_PAD, y + 26)
-              ctx.restore()
-            }
-            if (
-              pi === 0 &&
-              (measureIndex === 0 ||
-                effTempo[measureIndex] !== effTempo[measureIndex - 1])
-            ) {
-              ctx.save()
-              ctx.setFont('Arial', 12, 'bold')
-              ctx.fillText(
-                `♩=${Math.round(effTempo[measureIndex])}`,
-                stave.getNoteStartX() - 8,
-                Math.max(y + 9, stave.getYForLine(0) - 6),
-              )
-              ctx.restore()
-            }
-            drawMeasure({
-              ctx,
-              stave,
-              clef: eClef,
-              measure,
-              measureIndex,
-              partIndex: pi,
-              time: eTime,
-              cursor: NO_CURSOR,
-              preview: null,
-              previewOverflow: false,
-              selection: null,
-            })
+    pageSystems.forEach((row, sIdx) => {
+      const systemTop = TOP_PAD + sIdx * systemHeight
+      let x = LABEL_W + LEFT_PAD
+      for (let col = 0; col < row.length; col++) {
+        const measureIndex = row[col]
+        const isFirst = col === 0
+        const w = colNoteW[measureIndex] + (isFirst ? FIRST_EXTRA : 0)
+        for (let pi = 0; pi < parts.length; pi++) {
+          const part = parts[pi]
+          const measure = part.measures[measureIndex]
+          const y = systemTop + pi * STAVE_H
+          const eClef = effClef[pi][measureIndex]
+          const eKey = effKey[pi][measureIndex]
+          const eTime = effTime[pi][measureIndex]
+          const stave = new Stave(x, y, w)
+          if (isFirst || clefChange[pi][measureIndex]) stave.addClef(eClef)
+          if (isFirst || keyChange[pi][measureIndex]) {
+            stave.addKeySignature(keyName(eKey))
           }
-          x += w
+          if (isFirst || timeChange[pi][measureIndex]) {
+            stave.addTimeSignature(`${eTime.beats}/${eTime.beatType}`)
+          }
+          stave.setContext(ctx).draw()
+          if (isFirst) {
+            ctx.save()
+            ctx.setFont('Arial', 12, 'bold')
+            ctx.fillText(part.name, LEFT_PAD, y + 26)
+            ctx.restore()
+          }
+          if (
+            pi === 0 &&
+            (measureIndex === 0 ||
+              effTempo[measureIndex] !== effTempo[measureIndex - 1])
+          ) {
+            ctx.save()
+            ctx.setFont('Arial', 12, 'bold')
+            ctx.fillText(
+              `♩=${Math.round(effTempo[measureIndex])}`,
+              stave.getNoteStartX() - 8,
+              Math.max(y + 9, stave.getYForLine(0) - 6),
+            )
+            ctx.restore()
+          }
+          drawMeasure({
+            ctx,
+            stave,
+            clef: eClef,
+            measure,
+            measureIndex,
+            partIndex: pi,
+            time: eTime,
+            cursor: NO_CURSOR,
+            preview: null,
+            previewOverflow: false,
+            selection: null,
+          })
         }
-      })
+        x += w
+      }
+    })
 
-      const svg = div.querySelector('svg')
-      if (svg) svgs.push(svg as SVGSVGElement)
-    }
-  } finally {
-    // Keep host attached only if needed; svg2pdf needs the elements in DOM,
-    // so the caller removes `host` after export. Stash it on the first svg.
-    if (svgs.length > 0) {
-      ;(svgs[0] as SVGSVGElement & { _host?: HTMLElement })._host = host
-    } else {
-      host.remove()
-    }
+    canvases.push(canvas)
   }
-  return svgs
-}
-
-/** Remove the off-screen host created by renderScorePages. */
-export function cleanupPages(svgs: SVGSVGElement[]): void {
-  const host = (svgs[0] as (SVGSVGElement & { _host?: HTMLElement }) | undefined)
-    ?._host
-  if (host) host.remove()
+  return canvases
 }

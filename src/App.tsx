@@ -543,10 +543,12 @@ export default function App() {
   }
 
   function exportPdf() {
-    exportPDF(score.score, `${safeName()}.pdf`).catch((err: unknown) => {
+    try {
+      exportPDF(score.score, `${safeName()}.pdf`)
+    } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       alert(`PDF書き出しに失敗しました: ${msg}`)
-    })
+    }
   }
 
   const [rendering, setRendering] = useState(false)
