@@ -52,6 +52,15 @@ const NOTE_STYLE_SELECT: NoteStyle = {
   fillStyle: COLOR_SELECT,
   strokeStyle: COLOR_SELECT,
 }
+// Per-voice colours so 1st/2nd/3rd/4th voices are distinguishable.
+const VOICE_COLOR = ['#16181d', '#1f6feb', '#1f9d57', '#c2255c']
+const VOICE_COLOR_DIM = [
+  'rgba(22,24,29,0.32)',
+  'rgba(31,111,235,0.38)',
+  'rgba(31,157,87,0.42)',
+  'rgba(194,37,92,0.42)',
+]
+const CARET_COLOR = '#e8590c' // insertion-point vertical line
 
 const KEY_NAMES = [
   'Cb', 'Gb', 'Db', 'Ab', 'Eb', 'Bb', 'F',
@@ -150,7 +159,9 @@ export function VexRenderer({
     // Horizontal spread without distorting glyphs: stretch X logical coords by
     // hstretch so that, after the uniform ctx.scale(zoomY), the pixel width is
     // base*zoomX while glyphs stay base*zoomY (uniform).
-    const hstretch = zoomX / zoomY
+    // zoomY uniformly scales everything (glyphs + layout) via ctx.scale, so notes
+    // always fit their measure. zoomX adds *extra* horizontal spread on top.
+    const hstretch = zoomX
     const logicalW = Math.max(320, containerWidth / zoomY)
     const usableW = logicalW - LABEL_W - LEFT_PAD - RIGHT_MARGIN
     const mw = MEASURE_W * hstretch // stretched note-area width per measure
@@ -566,10 +577,20 @@ function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
     elements: NoteElement[]
   }[] = []
 
+  const isCursorPart = partIndex === cursor.partIndex
+
   modelVoices.forEach((elements, vi) => {
     const showHere = showPreview && vi === cursor.voiceIndex
     const overflowExisting = showHere && previewOverflow
     const notes: StaveNote[] = []
+
+    // Voice colour: distinguishes 1st/2nd/3rd/4th; non-active voices in the
+    // cursor's part are dimmed to emphasise the layer being edited.
+    const dimVoice = isCursorPart && multi && vi !== cursor.voiceIndex
+    const vColor = dimVoice
+      ? VOICE_COLOR_DIM[vi % VOICE_COLOR_DIM.length]
+      : VOICE_COLOR[vi % VOICE_COLOR.length]
+    const voiceStyle: NoteStyle = { fillStyle: vColor, strokeStyle: vColor }
 
     if (elements.length === 0 && !showHere) {
       // Only voice 0 of a fully-empty measure shows a whole rest; extra empty
@@ -589,7 +610,7 @@ function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
           ? NOTE_STYLE_SELECT
           : overflowExisting
             ? NOTE_STYLE_OVERFLOW
-            : undefined
+            : voiceStyle
         notes.push(buildStaveNote(el, clef, style))
       })
       if (showHere && preview) {
@@ -664,6 +685,37 @@ function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
       } catch {
         /* ignore tie failures */
       }
+    }
+  }
+
+  // Insertion caret: a vertical line at the cursor's position in its voice.
+  if (isCursorCell) {
+    const cv = built.find((b) => b.voiceIndex === cursor.voiceIndex)
+    let caretX: number | null = null
+    if (cv && cv.realCount > 0) {
+      try {
+        if (cursor.elementIndex < cv.realCount) {
+          caretX = cv.notes[cursor.elementIndex].getAbsoluteX() - 7
+        } else {
+          caretX = cv.notes[cv.realCount - 1].getAbsoluteX() + 20
+        }
+      } catch {
+        caretX = null
+      }
+    } else {
+      caretX = stave.getNoteStartX()
+    }
+    if (caretX != null) {
+      const top = stave.getYForLine(0) - 8
+      const bottom = stave.getYForLine(4) + 8
+      ctx.save()
+      ctx.setStrokeStyle(CARET_COLOR)
+      ctx.setLineWidth(2)
+      ctx.beginPath()
+      ctx.moveTo(caretX, top)
+      ctx.lineTo(caretX, bottom)
+      ctx.stroke()
+      ctx.restore()
     }
   }
 

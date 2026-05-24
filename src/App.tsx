@@ -524,7 +524,15 @@ export default function App() {
     {
       id: 'symbols',
       label: '記号',
-      icon: '♯',
+      icon: (
+        <span
+          className="smufl-icon"
+          aria-hidden
+          style={{ letterSpacing: '-3px' }}
+        >
+          {''}
+        </span>
+      ),
       content: (
         <SymbolDrawer
           score={score.score}
@@ -592,7 +600,22 @@ export default function App() {
     {
       id: 'zoom',
       label: '表示',
-      icon: '⤢',
+      icon: (
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      ),
       content: (
         <ZoomDrawer
           zoomY={settings.zoomY}

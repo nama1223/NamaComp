@@ -284,6 +284,16 @@ button {
 .rail-icon {
   font-size: 18px;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+}
+/* SMuFL glyphs (bass clef + flats) rendered with the loaded music fonts. */
+.smufl-icon {
+  font-family: 'Bravura', 'Leland', 'Petaluma', serif;
+  font-size: 19px;
+  line-height: 1;
 }
 
 .drawer-panel {

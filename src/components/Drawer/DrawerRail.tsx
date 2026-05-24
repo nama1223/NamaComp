@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react'
 export interface DrawerDef {
   id: string
   label: string
-  icon: string
+  icon: ReactNode
   content: ReactNode
 }
 
