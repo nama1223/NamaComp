@@ -509,9 +509,6 @@ export default function App() {
     }))
   }
 
-  function appendMeasure() {
-    score.addMeasure()
-  }
   function insertMeasure() {
     score.insertMeasure(input.cursor.measureIndex)
   }
@@ -633,7 +630,7 @@ export default function App() {
         <MeasureDrawer
           measureCount={measureCount}
           cursorMeasureIndex={input.cursor.measureIndex}
-          onAppend={appendMeasure}
+          onAppendMany={(n) => score.addMeasures(n)}
           onInsertAfter={insertMeasure}
           onDelete={deleteMeasure}
           voiceCount={cursorVoiceCount}
@@ -790,6 +787,7 @@ export default function App() {
         zoomY={settings.zoomY}
         zoomX={settings.zoomX}
         layoutMode={settings.layoutMode}
+        dark={settings.theme === 'dark'}
         onZoomY={(z) => update({ zoomY: z })}
         cursor={input.cursor}
         preview={input.method === 'picker' ? input.previewNote : null}

@@ -316,6 +316,13 @@ export function appendMeasure(score: Score): Score {
   return { ...score, parts }
 }
 
+/** Append `n` empty measures to every part. */
+export function appendMeasures(score: Score, n: number): Score {
+  let s = score
+  for (let i = 0; i < Math.max(0, Math.floor(n)); i++) s = appendMeasure(s)
+  return s
+}
+
 /** Insert an empty measure right after `measureIndex` in every part. */
 export function insertMeasureAfter(score: Score, measureIndex: number): Score {
   const parts = score.parts.map((p) => {

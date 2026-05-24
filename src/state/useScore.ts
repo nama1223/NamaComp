@@ -5,6 +5,7 @@ import type { Part } from '../types/score'
 import {
   addVoice,
   appendMeasure,
+  appendMeasures,
   createDefaultScore,
   deleteElement,
   deleteMeasure,
@@ -167,6 +168,11 @@ export function useScore() {
 
   const addMeasure = useCallback(() => commit((s) => appendMeasure(s)), [commit])
 
+  const addMeasures = useCallback(
+    (n: number) => commit((s) => appendMeasures(s, n)),
+    [commit],
+  )
+
   const insertMeasure = useCallback(
     (measureIndex: number) =>
       commit((s) => insertMeasureAfter(s, measureIndex)),
@@ -210,6 +216,7 @@ export function useScore() {
       addVoiceAt,
       removeVoiceAt,
       addMeasure,
+      addMeasures,
       insertMeasure,
       removeMeasure,
       updateMeta,
@@ -230,6 +237,7 @@ export function useScore() {
       addVoiceAt,
       removeVoiceAt,
       addMeasure,
+      addMeasures,
       insertMeasure,
       removeMeasure,
       updateMeta,

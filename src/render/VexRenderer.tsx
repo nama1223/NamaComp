@@ -35,6 +35,7 @@ const FIRST_EXTRA = 64 // extra width for clef/key/time on a system's first meas
 const RIGHT_MARGIN = 14
 
 const COLOR_NORMAL = '#16181d'
+const COLOR_DARK_FG = '#e8eaee'
 const COLOR_PREVIEW = '#1d6fe0'
 const COLOR_OVERFLOW = '#e23b3b'
 const HILITE = 'rgba(29,111,224,0.10)'
@@ -98,6 +99,8 @@ export interface VexRendererProps {
   zoomX: number
   /** 'wrap' = systems wrap to width; 'scroll' = all measures in one row. */
   layoutMode?: 'wrap' | 'scroll'
+  /** Dark theme: draw staff/notes/text in a light foreground. */
+  dark?: boolean
   containerWidth: number
   cursor: Cursor
   preview?: NoteElement | null
@@ -133,6 +136,7 @@ export function VexRenderer({
   zoomY,
   zoomX,
   layoutMode,
+  dark,
   containerWidth,
   cursor,
   preview,
@@ -285,6 +289,10 @@ export function VexRenderer({
     renderer.resize(logicalContentW * zoomY, logicalH * zoomY)
     const ctx = renderer.getContext()
     ctx.scale(zoomY, zoomY)
+    // Foreground colour (staff lines, clefs, rests, text) — light in dark mode.
+    const fg = dark ? COLOR_DARK_FG : COLOR_NORMAL
+    ctx.setFillStyle(fg)
+    ctx.setStrokeStyle(fg)
 
     for (let s = 0; s < systemCount; s++) {
       const systemTop = TOP_PAD + s * systemHeight
@@ -337,7 +345,7 @@ export function VexRenderer({
           if (isFirst) {
             ctx.save()
             ctx.setFont('Arial', 12, 'bold')
-            ctx.setFillStyle(COLOR_NORMAL)
+            ctx.setFillStyle(fg)
             ctx.fillText(part.name, LEFT_PAD, y + 26)
             ctx.restore()
           }
@@ -350,7 +358,7 @@ export function VexRenderer({
           ) {
             ctx.save()
             ctx.setFont('Arial', 12, 'bold')
-            ctx.setFillStyle(COLOR_NORMAL)
+            ctx.setFillStyle(fg)
             ctx.fillText(
               `♩=${Math.round(effTempo[measureIndex])}`,
               stave.getNoteStartX() - 8,
@@ -371,6 +379,7 @@ export function VexRenderer({
             preview: preview ?? null,
             previewOverflow: !!previewOverflow,
             selection: selection ?? null,
+            fg,
           })
 
           // Cell-level hitbox (fallback / append target).
@@ -404,6 +413,7 @@ export function VexRenderer({
     zoomY,
     zoomX,
     layoutMode,
+    dark,
     containerWidth,
     cursor,
     preview,
@@ -558,6 +568,8 @@ export interface DrawMeasureArgs {
   preview: NoteElement | null
   previewOverflow: boolean
   selection: NormSelection | null
+  /** Foreground colour (light in dark mode) for voice 0 + plain glyphs. */
+  fg: string
 }
 
 interface ElementHit {
@@ -618,6 +630,7 @@ export function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
     preview,
     previewOverflow,
     selection,
+    fg,
   } = args
 
   const selHere =
@@ -629,6 +642,11 @@ export function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
   const multi = modelVoices.length > 1
   const allEmpty = modelVoices.every((v) => v.length === 0)
 
+  // Voice 0 uses the theme foreground; others get distinct hues.
+  const voiceColors = [fg, VOICE_COLOR[1], VOICE_COLOR[2], VOICE_COLOR[3]]
+  const fgDim = fg === COLOR_NORMAL ? VOICE_COLOR_DIM[0] : 'rgba(232,234,238,0.4)'
+  const voiceDims = [fgDim, VOICE_COLOR_DIM[1], VOICE_COLOR_DIM[2], VOICE_COLOR_DIM[3]]
+
   const vexVoices: Voice[] = []
   const allTuplets: Tuplet[] = []
   const built: {
@@ -636,6 +654,7 @@ export function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
     notes: StaveNote[]
     realCount: number
     elements: NoteElement[]
+    previewNote: StaveNote | null
   }[] = []
 
   const isCursorPart = partIndex === cursor.partIndex
@@ -643,50 +662,51 @@ export function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
   modelVoices.forEach((elements, vi) => {
     const showHere = showPreview && vi === cursor.voiceIndex
     const overflowExisting = showHere && previewOverflow
-    const notes: StaveNote[] = []
 
-    // Voice colour: distinguishes 1st/2nd/3rd/4th; non-active voices in the
-    // cursor's part are dimmed to emphasise the layer being edited.
     const dimVoice = isCursorPart && multi && vi !== cursor.voiceIndex
     const vColor = dimVoice
-      ? VOICE_COLOR_DIM[vi % VOICE_COLOR_DIM.length]
-      : VOICE_COLOR[vi % VOICE_COLOR.length]
+      ? voiceDims[vi % voiceDims.length]
+      : voiceColors[vi % voiceColors.length]
     const voiceStyle: NoteStyle = { fillStyle: vColor, strokeStyle: vColor }
 
-    if (elements.length === 0 && !showHere) {
-      // Only voice 0 of a fully-empty measure shows a whole rest; extra empty
-      // voices render nothing.
+    // Committed notes (parallel to `elements`) — used for tuplets/ties/slurs/hits.
+    const realNotes: StaveNote[] = elements.map((el, i) => {
+      const isSel =
+        selHere != null &&
+        vi === selHere.voiceIndex &&
+        inNormSelection(selHere, measureIndex, i)
+      const style = isSel
+        ? NOTE_STYLE_SELECT
+        : overflowExisting
+          ? NOTE_STYLE_OVERFLOW
+          : voiceStyle
+      return buildStaveNote(el, clef, style)
+    })
+
+    // The preview is inserted at the cursor position so it appears where the
+    // note will actually go (WYSIWYG), not always at the end.
+    let previewNote: StaveNote | null = null
+    let voiceNotes: StaveNote[] = realNotes
+    if (showHere && preview) {
+      const style = previewOverflow ? NOTE_STYLE_OVERFLOW : NOTE_STYLE_PREVIEW
+      previewNote = buildStaveNote(preview, clef, style)
+      const at = Math.max(0, Math.min(cursor.elementIndex, realNotes.length))
+      voiceNotes = [...realNotes.slice(0, at), previewNote, ...realNotes.slice(at)]
+    } else if (elements.length === 0) {
+      // Empty voice: only voice 0 of a fully-empty measure shows a whole rest.
       if (vi === 0 && allEmpty) {
-        notes.push(buildStaveNote(makeRest({ value: 1, dots: 0 }), clef))
+        voiceNotes = [buildStaveNote(makeRest({ value: 1, dots: 0 }), clef)]
       } else {
         return
       }
-    } else {
-      elements.forEach((el, i) => {
-        const isSel =
-          selHere != null &&
-          vi === selHere.voiceIndex &&
-          inNormSelection(selHere, measureIndex, i)
-        const style = isSel
-          ? NOTE_STYLE_SELECT
-          : overflowExisting
-            ? NOTE_STYLE_OVERFLOW
-            : voiceStyle
-        notes.push(buildStaveNote(el, clef, style))
-      })
-      if (showHere && preview) {
-        const style = previewOverflow ? NOTE_STYLE_OVERFLOW : NOTE_STYLE_PREVIEW
-        notes.push(buildStaveNote(preview, clef, style))
-      }
     }
 
-    if (notes.length === 0) return
+    if (voiceNotes.length === 0) return
 
-    // Fixed stem directions keep two voices visually separated.
     if (multi) {
       const dir = vi === 0 ? Stem.UP : vi === 1 ? Stem.DOWN : null
       if (dir !== null) {
-        for (const n of notes) {
+        for (const n of voiceNotes) {
           try {
             n.setStemDirection(dir)
           } catch {
@@ -698,10 +718,16 @@ export function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
 
     const voice = new Voice({ numBeats: time.beats, beatValue: time.beatType })
     voice.setStrict(false)
-    voice.addTickables(notes)
+    voice.addTickables(voiceNotes)
     vexVoices.push(voice)
-    allTuplets.push(...buildVoiceTuplets(elements, notes))
-    built.push({ voiceIndex: vi, notes, realCount: elements.length, elements })
+    allTuplets.push(...buildVoiceTuplets(elements, realNotes))
+    built.push({
+      voiceIndex: vi,
+      notes: realNotes,
+      realCount: elements.length,
+      elements,
+      previewNote,
+    })
   })
 
   if (vexVoices.length === 0) return []
@@ -781,7 +807,7 @@ export function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
         }
         ctx.save()
         ctx.setFont('Georgia', 13, 'bold')
-        ctx.setFillStyle(COLOR_NORMAL)
+        ctx.setFillStyle(fg)
         ctx.fillText(dyn, dx - 4, dynY)
         ctx.restore()
       }
@@ -792,18 +818,21 @@ export function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
   if (isCursorCell) {
     const cv = built.find((b) => b.voiceIndex === cursor.voiceIndex)
     let caretX: number | null = null
-    if (cv && cv.realCount > 0) {
-      try {
+    try {
+      if (cv?.previewNote) {
+        // Preview sits exactly at the insertion point.
+        caretX = cv.previewNote.getAbsoluteX() - 7
+      } else if (cv && cv.realCount > 0) {
         if (cursor.elementIndex < cv.realCount) {
           caretX = cv.notes[cursor.elementIndex].getAbsoluteX() - 7
         } else {
           caretX = cv.notes[cv.realCount - 1].getAbsoluteX() + 20
         }
-      } catch {
-        caretX = null
+      } else {
+        caretX = stave.getNoteStartX()
       }
-    } else {
-      caretX = stave.getNoteStartX()
+    } catch {
+      caretX = null
     }
     if (caretX != null) {
       const top = stave.getYForLine(0) - 8

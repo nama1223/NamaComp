@@ -12,8 +12,8 @@ const LEFT_PAD = 8
 const TOP_PAD = 16
 const STAVE_H = 92
 const SYSTEM_GAP = 38
-const MEASURE_W = 220
-const FIRST_EXTRA = 70
+const MEASURE_W = 150
+const FIRST_EXTRA = 64
 const RIGHT_MARGIN = 16
 
 // Page pixels (A4 portrait ratio ≈ 1.414).
@@ -201,6 +201,7 @@ export function renderScorePages(score: Score): HTMLCanvasElement[] {
             preview: null,
             previewOverflow: false,
             selection: null,
+            fg: '#16181d',
           })
         }
         x += w
