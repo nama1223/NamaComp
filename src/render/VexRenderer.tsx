@@ -156,29 +156,61 @@ export function VexRenderer({
     const parts = score.parts
     if (parts.length === 0) return
 
-    // Horizontal spread without distorting glyphs: stretch X logical coords by
-    // hstretch so that, after the uniform ctx.scale(zoomY), the pixel width is
-    // base*zoomX while glyphs stay base*zoomY (uniform).
-    // zoomY uniformly scales everything (glyphs + layout) via ctx.scale, so notes
-    // always fit their measure. zoomX adds *extra* horizontal spread on top.
+    // zoomY uniformly scales glyphs + layout via ctx.scale (no distortion).
+    // zoomX adds extra horizontal note spacing on top (hstretch).
     const hstretch = zoomX
     const logicalW = Math.max(320, containerWidth / zoomY)
     const usableW = logicalW - LABEL_W - LEFT_PAD - RIGHT_MARGIN
-    const mw = MEASURE_W * hstretch // stretched note-area width per measure
-    // How many stretched measures fit one row. Smaller 横 packs more; larger 横
-    // packs fewer and, once a single measure exceeds the row, overflows →
-    // horizontal scroll.
-    const measuresPerSystem = Math.max(
-      1,
-      Math.floor((usableW - FIRST_EXTRA) / mw),
-    )
+    const mw = MEASURE_W * hstretch // desired note-area width per measure
     const totalMeasures = Math.max(...parts.map((p) => p.measures.length))
-    const systemCount = Math.max(1, Math.ceil(totalMeasures / measuresPerSystem))
 
-    // Widest possible system → content width (≥ container so SVG fills it).
-    const contentW =
-      LABEL_W + LEFT_PAD + FIRST_EXTRA + measuresPerSystem * mw + RIGHT_MARGIN
-    const logicalContentW = Math.max(logicalW, contentW)
+    // Each measure's note-area width = max(desired, minimum needed for its note
+    // count) so notes never spill past the barline (dense measures / small 横).
+    const MIN_PER_NOTE = 30
+    const colNoteW: number[] = []
+    for (let mi = 0; mi < totalMeasures; mi++) {
+      let maxTick = 1
+      for (const p of parts) {
+        const m = p.measures[mi]
+        if (!m) continue
+        for (const v of m.voices) if (v.length > maxTick) maxTick = v.length
+      }
+      if (cursor.measureIndex === mi) maxTick += 1 // room for the preview note
+      const minNeeded = 30 + maxTick * MIN_PER_NOTE
+      colNoteW.push(Math.max(mw, minNeeded))
+    }
+
+    // Pack measures into systems by accumulated width (variable widths). The
+    // first measure of a system also carries the clef/key/time (FIRST_EXTRA).
+    const systems: number[][] = []
+    {
+      let row: number[] = []
+      let rowW = 0
+      for (let mi = 0; mi < totalMeasures; mi++) {
+        const first = row.length === 0
+        const wCol = colNoteW[mi] + (first ? FIRST_EXTRA : 0)
+        if (!first && rowW + wCol > usableW) {
+          systems.push(row)
+          row = [mi]
+          rowW = colNoteW[mi] + FIRST_EXTRA
+        } else {
+          row.push(mi)
+          rowW += wCol
+        }
+      }
+      if (row.length) systems.push(row)
+      if (systems.length === 0) systems.push([])
+    }
+    const systemCount = systems.length
+
+    let logicalContentW = logicalW
+    for (const row of systems) {
+      let w = LABEL_W + LEFT_PAD + RIGHT_MARGIN
+      row.forEach((mi, idx) => {
+        w += colNoteW[mi] + (idx === 0 ? FIRST_EXTRA : 0)
+      })
+      if (w > logicalContentW) logicalContentW = w
+    }
 
     const systemHeight = parts.length * STAVE_H + SYSTEM_GAP
     const logicalH = TOP_PAD + systemCount * systemHeight
@@ -244,14 +276,13 @@ export function VexRenderer({
 
     for (let s = 0; s < systemCount; s++) {
       const systemTop = TOP_PAD + s * systemHeight
-      const startMeasure = s * measuresPerSystem
-      const colCount = Math.min(measuresPerSystem, totalMeasures - startMeasure)
+      const row = systems[s]
 
       let x = LABEL_W + LEFT_PAD
-      for (let col = 0; col < colCount; col++) {
-        const measureIndex = startMeasure + col
+      for (let col = 0; col < row.length; col++) {
+        const measureIndex = row[col]
         const isFirst = col === 0
-        const w = mw + (isFirst ? FIRST_EXTRA : 0)
+        const w = colNoteW[measureIndex] + (isFirst ? FIRST_EXTRA : 0)
 
         for (let pi = 0; pi < parts.length; pi++) {
           const part = parts[pi]
