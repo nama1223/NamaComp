@@ -11,6 +11,7 @@ interface SymbolDrawerProps {
   onSetMeasureKey: (measureIndex: number, fifths: number) => void
   onSetTime: (time: TimeSignature) => void
   onSetMeasureTime: (measureIndex: number, time: TimeSignature) => void
+  onTranspose: (semitones: number) => void
 }
 
 const CLEFS: { value: Clef; label: string }[] = [
@@ -75,6 +76,7 @@ export function SymbolDrawer({
   onSetMeasureKey,
   onSetTime,
   onSetMeasureTime,
+  onTranspose,
 }: SymbolDrawerProps) {
   const [scope, setScope] = useState<Scope>('all')
   const part = score.parts[cursorPartIndex]
@@ -157,6 +159,16 @@ export function SymbolDrawer({
               </button>
             )
           })}
+        </div>
+      </div>
+
+      <div className="sym-group">
+        <span className="sym-label">全体移調（曲全体・半音）</span>
+        <div className="sym-row">
+          <button onClick={() => onTranspose(-1)}>♭ -1</button>
+          <button onClick={() => onTranspose(-12)}>-1oct</button>
+          <button onClick={() => onTranspose(12)}>+1oct</button>
+          <button onClick={() => onTranspose(1)}>♯ +1</button>
         </div>
       </div>
     </div>

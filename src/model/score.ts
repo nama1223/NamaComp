@@ -13,6 +13,7 @@ import type {
   TimeSignature,
 } from '../types/score'
 import { durationToWholeFraction } from './duration'
+import { midiToPitch, pitchToMidi } from './pitch'
 
 export function uid(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -177,6 +178,9 @@ export function cloneElements(els: NoteElement[]): NoteElement[] {
     },
     ...(el.accidentals ? { accidentals: [...el.accidentals] } : {}),
     ...(el.articulations ? { articulations: [...el.articulations] } : {}),
+    ...(el.slurStart ? { slurStart: true } : {}),
+    ...(el.slurStop ? { slurStop: true } : {}),
+    ...(el.dynamic ? { dynamic: el.dynamic } : {}),
   }))
 }
 
@@ -375,6 +379,78 @@ export function setMeasureTime(
     ),
   }))
   return { ...score, parts }
+}
+
+/** Set (or clear with undefined) the tempo starting at `measureIndex`. */
+export function setMeasureTempo(
+  score: Score,
+  measureIndex: number,
+  tempo: number | undefined,
+): Score {
+  const parts = score.parts.map((p) => ({
+    ...p,
+    measures: p.measures.map((m, i) => {
+      if (i !== measureIndex) return m
+      const next = { ...m }
+      if (tempo === undefined) delete next.tempo
+      else next.tempo = tempo
+      return next
+    }),
+  }))
+  return { ...score, parts }
+}
+
+/** Effective tempo (quarter BPM) at each measure index, following overrides. */
+export function tempoTimeline(score: Score): number[] {
+  const count = Math.max(0, ...score.parts.map((p) => p.measures.length))
+  const longest = score.parts.reduce(
+    (a, p) => (p.measures.length >= a.measures.length ? p : a),
+    score.parts[0],
+  )
+  const out: number[] = []
+  let cur = score.tempo
+  for (let i = 0; i < count; i++) {
+    const t = longest?.measures[i]?.tempo
+    if (t !== undefined) cur = t
+    out.push(cur)
+  }
+  return out
+}
+
+// --- whole-score transpose --------------------------------------------------
+
+const fifthsToPc = (f: number): number => (((f * 7) % 12) + 12) % 12
+function pcToFifths(pc: number): number {
+  for (let f = -5; f <= 6; f++) if (fifthsToPc(f) === pc) return f
+  return 0
+}
+
+/** Transpose every written pitch (and key signatures) by `semitones`. */
+export function transposeScore(score: Score, semitones: number): Score {
+  if (semitones === 0) return score
+  const shiftKey = (fifths: number) =>
+    pcToFifths((fifthsToPc(fifths) + semitones) % 12)
+
+  const mapEl = (el: NoteElement): NoteElement => {
+    if (el.kind !== 'note') return el
+    const pitches = el.pitches.map((p) =>
+      midiToPitch(pitchToMidi(p) + semitones),
+    )
+    // Drop forced accidental overrides; they re-derive from the new alter.
+    const { accidentals: _drop, ...rest } = el
+    void _drop
+    return { ...rest, pitches }
+  }
+
+  const parts = score.parts.map((part) => ({
+    ...part,
+    measures: part.measures.map((m) => ({
+      ...m,
+      voices: m.voices.map((v) => v.map(mapEl)),
+      ...(m.keyFifths !== undefined ? { keyFifths: shiftKey(m.keyFifths) } : {}),
+    })),
+  }))
+  return { ...score, parts, keyFifths: shiftKey(score.keyFifths) }
 }
 
 export function setScoreMeta(score: Score, patch: Partial<Score>): Score {

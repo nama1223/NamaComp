@@ -1,6 +1,9 @@
 interface ExpressionDrawerProps {
   onArticulate: (code: string) => void
   onTie: () => void
+  onSlur: () => void
+  onDynamic: (code: string) => void
+  hasSelection: boolean
 }
 
 const ARTICULATIONS: { code: string; glyph: string; label: string }[] = [
@@ -11,7 +14,15 @@ const ARTICULATIONS: { code: string; glyph: string; label: string }[] = [
   { code: 'fermata', glyph: '𝄐', label: 'フェルマータ' },
 ]
 
-export function ExpressionDrawer({ onArticulate, onTie }: ExpressionDrawerProps) {
+const DYNAMICS = ['pp', 'p', 'mp', 'mf', 'f', 'ff']
+
+export function ExpressionDrawer({
+  onArticulate,
+  onTie,
+  onSlur,
+  onDynamic,
+  hasSelection,
+}: ExpressionDrawerProps) {
   return (
     <div className="drawer-content">
       {ARTICULATIONS.map((a) => (
@@ -26,6 +37,23 @@ export function ExpressionDrawer({ onArticulate, onTie }: ExpressionDrawerProps)
       <button title="次の音符へタイ" onClick={onTie}>
         ⌒ タイ
       </button>
+      <button
+        title="選択範囲にスラー（先頭→末尾）"
+        disabled={!hasSelection}
+        onClick={onSlur}
+      >
+        ⌒ スラー
+      </button>
+      {DYNAMICS.map((d) => (
+        <button
+          key={d}
+          className="dyn-btn"
+          title="選択範囲先頭またはカーソルの音符に強弱"
+          onClick={() => onDynamic(d)}
+        >
+          {d}
+        </button>
+      ))}
     </div>
   )
 }

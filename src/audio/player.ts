@@ -13,65 +13,87 @@ export interface PlayEvent {
   /** Seconds the note sounds. */
   dur: number
   freq: number
+  /** 0..1 loudness (from dynamics). */
+  vel: number
 }
 
-/** Flatten a score into scheduled note events (seconds), applying transpose. */
+// Dynamic marking → relative loudness (0..1).
+const DYN_VEL: Record<string, number> = {
+  ppp: 0.2,
+  pp: 0.3,
+  p: 0.42,
+  mp: 0.55,
+  mf: 0.68,
+  f: 0.82,
+  ff: 0.92,
+  fff: 1,
+}
+
+/** Per-measure start time (sec) + whole-note seconds, following tempo/time. */
+function buildTimeline(score: Score): {
+  startSec: number[]
+  spw: number[]
+  count: number
+} {
+  const count = Math.max(0, ...score.parts.map((p) => p.measures.length))
+  const longest = score.parts.reduce(
+    (a, p) => (p.measures.length >= a.measures.length ? p : a),
+    score.parts[0],
+  )
+  const startSec: number[] = []
+  const spw: number[] = []
+  let t = 0
+  let curTempo = score.tempo
+  let curTime = score.time
+  for (let i = 0; i < count; i++) {
+    const m = longest?.measures[i]
+    if (m?.tempo !== undefined) curTempo = m.tempo
+    if (m?.time) curTime = m.time
+    const sec = 240 / curTempo // whole-note seconds at this tempo
+    startSec.push(t)
+    spw.push(sec)
+    t += measureCapacityWhole(curTime) * sec
+  }
+  return { startSec, spw, count }
+}
+
+/** Flatten a score into scheduled note events (seconds), applying transpose,
+ *  per-measure tempo, and dynamics (which persist per part). */
 export function scoreToEvents(score: Score): { events: PlayEvent[]; total: number } {
   const events: PlayEvent[] = []
-  const secPerWhole = 240 / score.tempo // whole note seconds = 4 * (60/bpm)
+  const { startSec, spw } = buildTimeline(score)
 
   for (const part of score.parts) {
-    // Measure-aligned: each measure starts at its boundary so parts stay in
-    // sync even when a bar isn't completely filled. A time-signature override
-    // persists from its measure onward (matches the renderer).
-    let measureStart = 0
-    let curTime = score.time
-    for (const measure of part.measures) {
-      if (measure.time) curTime = measure.time
-      const measureSec = measureCapacityWhole(curTime) * secPerWhole
-
-      // Each voice runs in parallel, restarting at the measure boundary.
+    let vel = DYN_VEL.mf // current dynamic for this part
+    part.measures.forEach((measure, mi) => {
+      const sec = spw[mi] ?? 240 / score.tempo
+      const base = startSec[mi] ?? 0
       for (const voice of measure.voices) {
-        let local = measureStart
+        let local = base
         for (const el of voice) {
-          const durSec = durationToWholeFraction(el.duration) * secPerWhole
+          if (el.dynamic && DYN_VEL[el.dynamic] !== undefined) {
+            vel = DYN_VEL[el.dynamic]
+          }
+          const durSec = durationToWholeFraction(el.duration) * sec
           if (el.kind === 'note') {
             for (const pitch of el.pitches) {
               const midi = pitchToMidi(pitch) + part.transpose
-              events.push({ time: local, dur: durSec, freq: midiToFreq(midi) })
+              events.push({ time: local, dur: durSec, freq: midiToFreq(midi), vel })
             }
           }
           local += durSec
         }
       }
-      measureStart += measureSec
-    }
+    })
   }
 
-  // End at the last sounding note (avoid long silence from trailing empty bars).
   const total = events.reduce((m, e) => Math.max(m, e.time + e.dur), 0)
   return { events, total }
 }
 
 /** Cumulative start time (seconds) of each measure — drives the playhead. */
 export function measureStartTimes(score: Score): number[] {
-  const count = Math.max(0, ...score.parts.map((p) => p.measures.length))
-  if (count === 0) return []
-  const secPerWhole = 240 / score.tempo
-  // The longest part sources per-measure time overrides (falls back to global).
-  const longest = score.parts.reduce(
-    (a, p) => (p.measures.length >= a.measures.length ? p : a),
-    score.parts[0],
-  )
-  const starts: number[] = []
-  let t = 0
-  let curTime = score.time
-  for (let i = 0; i < count; i++) {
-    if (longest.measures[i]?.time) curTime = longest.measures[i]!.time!
-    starts.push(t)
-    t += measureCapacityWhole(curTime) * secPerWhole
-  }
-  return starts
+  return buildTimeline(score).startSec
 }
 
 /** Schedule one triangle-osc note with a short ADSR onto any audio context.
@@ -90,7 +112,7 @@ export function scheduleNote(
   osc.frequency.value = ev.freq
 
   const gain = ctx.createGain()
-  const peak = 0.32
+  const peak = 0.32 * (ev.vel ?? 0.68)
   const attack = 0.008
   const release = Math.min(0.12, ev.dur * 0.4)
   gain.gain.setValueAtTime(0, t0)

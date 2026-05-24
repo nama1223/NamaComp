@@ -54,6 +54,12 @@ export interface NoteElement {
   articulations?: string[]
   tieStart?: boolean
   tieStop?: boolean
+  /** Slur endpoints (a slur spans slurStart → the next slurStop in the voice). */
+  slurStart?: boolean
+  slurStop?: boolean
+  /** Dynamic marking shown under this note (e.g. 'p','mf','ff'); persists in
+   *  playback until the next dynamic in the same part. */
+  dynamic?: string
 }
 
 export type Clef = 'treble' | 'bass' | 'alto' | 'tenor' | 'percussion'
@@ -73,6 +79,8 @@ export interface Measure {
   clef?: Clef
   keyFifths?: number
   time?: TimeSignature
+  /** Tempo (quarter BPM) starting at this measure; persists until next override. */
+  tempo?: number
 }
 
 export interface Part {

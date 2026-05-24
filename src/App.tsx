@@ -20,6 +20,9 @@ import {
   insertElements,
   updateElement,
   toggleArticulation,
+  transposeScore,
+  setMeasureTempo,
+  tempoTimeline,
 } from './model/score'
 import type { NoteElement, Score } from './types/score'
 import type { ClickTarget } from './render/VexRenderer'
@@ -376,6 +379,62 @@ export default function App() {
     )
   }
 
+  // Dynamics attach to a single note (selection start, else cursor note).
+  function setDynamic(code: string) {
+    let pi: number
+    let mi: number
+    let vi: number
+    let ei: number
+    if (normSelection) {
+      pi = normSelection.partIndex
+      vi = normSelection.voiceIndex
+      mi = normSelection.startMeasure
+      ei = normSelection.startEl
+    } else {
+      pi = input.cursor.partIndex
+      mi = input.cursor.measureIndex
+      vi = input.cursor.voiceIndex
+      const voice = score.score.parts[pi]?.measures[mi]?.voices[vi]
+      if (!voice || voice.length === 0) return
+      ei =
+        input.cursor.elementIndex < voice.length
+          ? input.cursor.elementIndex
+          : voice.length - 1
+    }
+    score.mutate((s) =>
+      updateElement(s, pi, mi, vi, ei, (el) =>
+        el.kind === 'note'
+          ? { ...el, dynamic: el.dynamic === code ? undefined : code }
+          : el,
+      ),
+    )
+  }
+
+  // Slur the selected range (start on first, stop on last).
+  function addSlur() {
+    if (!normSelection) return
+    const n = normSelection
+    score.mutate((s) => {
+      let next = updateElement(
+        s,
+        n.partIndex,
+        n.startMeasure,
+        n.voiceIndex,
+        n.startEl,
+        (el) => (el.kind === 'note' ? { ...el, slurStart: true } : el),
+      )
+      next = updateElement(
+        next,
+        n.partIndex,
+        n.endMeasure,
+        n.voiceIndex,
+        n.endEl,
+        (el) => (el.kind === 'note' ? { ...el, slurStop: true } : el),
+      )
+      return next
+    })
+  }
+
   // ── Ensemble (score manager) ──────────────────────────────────────────────
   function handleAddPart(preset: InstrumentPreset) {
     score.mutate((s) => addPart(s, preset))
@@ -550,6 +609,7 @@ export default function App() {
           onSetMeasureTime={(mi, time: TimeSignature) =>
             score.mutate((s) => setMeasureTime(s, mi, time))
           }
+          onTranspose={(semi) => score.mutate((s) => transposeScore(s, semi))}
         />
       ),
     },
@@ -594,7 +654,13 @@ export default function App() {
       label: '表現',
       icon: '＞',
       content: (
-        <ExpressionDrawer onArticulate={articulate} onTie={toggleTie} />
+        <ExpressionDrawer
+          onArticulate={articulate}
+          onTie={toggleTie}
+          onSlur={addSlur}
+          onDynamic={setDynamic}
+          hasSelection={input.selection !== null}
+        />
       ),
     },
     {
@@ -637,6 +703,19 @@ export default function App() {
           isPlaying={playback.isPlaying}
           onPlay={() => playback.toggle(score.score)}
           onStop={playback.stop}
+          cursorMeasureIndex={input.cursor.measureIndex}
+          cursorTempo={
+            tempoTimeline(score.score)[input.cursor.measureIndex] ??
+            score.score.tempo
+          }
+          hasMeasureTempo={
+            cursorMeasure?.tempo !== undefined
+          }
+          onSetMeasureTempo={(bpm) =>
+            score.mutate((s) =>
+              setMeasureTempo(s, input.cursor.measureIndex, bpm),
+            )
+          }
         />
       ),
     },

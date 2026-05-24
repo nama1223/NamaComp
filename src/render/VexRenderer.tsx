@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import {
   Beam,
+  Curve,
   Formatter,
   Renderer,
   Stave,
@@ -10,6 +11,7 @@ import {
   Tuplet,
   Voice,
 } from 'vexflow'
+import { tempoTimeline } from '../model/score'
 import type {
   Clef,
   Measure,
@@ -269,6 +271,9 @@ export function VexRenderer({
       timeChange.push(tc)
     }
 
+    // Effective tempo per measure (global); drawn where it changes.
+    const effTempo = tempoTimeline(score)
+
     const renderer = new Renderer(host, Renderer.Backends.SVG)
     renderer.resize(logicalContentW * zoomY, logicalH * zoomY)
     const ctx = renderer.getContext()
@@ -327,6 +332,23 @@ export function VexRenderer({
             ctx.setFont('Arial', 12, 'bold')
             ctx.setFillStyle(COLOR_NORMAL)
             ctx.fillText(part.name, LEFT_PAD, y + 26)
+            ctx.restore()
+          }
+
+          // Tempo marking above the top staff where the tempo changes.
+          if (
+            pi === 0 &&
+            (measureIndex === 0 ||
+              effTempo[measureIndex] !== effTempo[measureIndex - 1])
+          ) {
+            ctx.save()
+            ctx.setFont('Arial', 12, 'bold')
+            ctx.setFillStyle(COLOR_NORMAL)
+            ctx.fillText(
+              `♩=${Math.round(effTempo[measureIndex])}`,
+              stave.getNoteStartX() - 8,
+              Math.max(y + 9, stave.getYForLine(0) - 6),
+            )
             ctx.restore()
           }
 
@@ -715,6 +737,45 @@ function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
           .draw()
       } catch {
         /* ignore tie failures */
+      }
+    }
+  }
+
+  // Slurs within a voice: slurStart … the next slurStop.
+  for (const b of built) {
+    for (let i = 0; i < b.realCount; i++) {
+      if (!b.elements[i]?.slurStart) continue
+      let j = i + 1
+      while (j < b.realCount && !b.elements[j]?.slurStop) j++
+      const to = Math.min(j, b.realCount - 1)
+      if (to > i && b.notes[i] && b.notes[to]) {
+        try {
+          new Curve(b.notes[i], b.notes[to], {}).setContext(ctx).draw()
+        } catch {
+          /* ignore slur failures */
+        }
+      }
+    }
+  }
+
+  // Dynamics drawn under the staff at the note's x.
+  {
+    const dynY = stave.getYForLine(4) + 22
+    for (const b of built) {
+      for (let i = 0; i < b.realCount; i++) {
+        const dyn = b.elements[i]?.dynamic
+        if (!dyn || !b.notes[i]) continue
+        let dx: number
+        try {
+          dx = b.notes[i].getAbsoluteX()
+        } catch {
+          continue
+        }
+        ctx.save()
+        ctx.setFont('Georgia', 13, 'bold')
+        ctx.setFillStyle(COLOR_NORMAL)
+        ctx.fillText(dyn, dx - 4, dynY)
+        ctx.restore()
       }
     }
   }

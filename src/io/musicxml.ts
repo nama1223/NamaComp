@@ -98,12 +98,28 @@ function notationsXml(el: NoteElement, tieStop: boolean): string {
   let inner = ''
   if (tieStop) inner += '<tied type="stop"/>'
   if (el.tieStart) inner += '<tied type="start"/>'
+  if (el.slurStop) inner += '<slur type="stop" number="1"/>'
+  if (el.slurStart) inner += '<slur type="start" number="1"/>'
   const arts = (el.articulations ?? []).filter((a) => a in ARTIC_TO_XML)
   if (arts.length > 0) {
     inner += `<articulations>${arts.map((a) => ARTIC_TO_XML[a]).join('')}</articulations>`
   }
   if ((el.articulations ?? []).includes('fermata')) inner += '<fermata/>'
   return inner ? `<notations>${inner}</notations>` : ''
+}
+
+const DYN_TAGS = new Set([
+  'pppp', 'ppp', 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff', 'ffff',
+])
+
+/** A <direction> carrying a dynamic, emitted before the note it applies to. */
+function dynamicDirectionXml(el: NoteElement): string {
+  if (!el.dynamic || !DYN_TAGS.has(el.dynamic)) return ''
+  return (
+    `<direction placement="below"><direction-type>` +
+    `<dynamics><${el.dynamic}/></dynamics>` +
+    `</direction-type></direction>`
+  )
 }
 
 function noteToXml(el: NoteElement, voiceNum: number, tieStop: boolean): string {
@@ -211,7 +227,11 @@ function measureToXml(
       if (back > 0) notes += `<backup><duration>${back}</duration></backup>`
     }
     notes += voice
-      .map((el, i) => noteToXml(el, vi + 1, i > 0 && !!voice[i - 1].tieStart))
+      .map(
+        (el, i) =>
+          dynamicDirectionXml(el) +
+          noteToXml(el, vi + 1, i > 0 && !!voice[i - 1].tieStart),
+      )
       .join('')
   })
 
@@ -296,10 +316,14 @@ function parseNote(noteEl: Element): { element: NoteElement; isChord: boolean } 
   const tieStop =
     !!noteEl.querySelector('tie[type="stop"]') ||
     !!notations?.querySelector('tied[type="stop"]')
+  const slurStart = !!notations?.querySelector('slur[type="start"]')
+  const slurStop = !!notations?.querySelector('slur[type="stop"]')
   const extra = {
     ...(articulations.length > 0 ? { articulations } : {}),
     ...(tieStart ? { tieStart: true } : {}),
     ...(tieStop ? { tieStop: true } : {}),
+    ...(slurStart ? { slurStart: true } : {}),
+    ...(slurStop ? { slurStop: true } : {}),
   }
 
   if (isRest) {
