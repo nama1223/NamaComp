@@ -126,7 +126,7 @@ export function PickerRollInput({
         </div>
       </div>
 
-      {/* ── 音価ホイール (端同士ループ) + 連符 ── */}
+      {/* ── 音価ホイール (端同士ループ) ── */}
       <div className="picker-col length">
         <Wheel
           items={NOTE_VALUES}
@@ -140,25 +140,6 @@ export function PickerRollInput({
             </span>
           )}
         />
-        <div className="octave tuplet">
-          <button
-            onClick={() => {
-              const i = TUPLETS.indexOf(picker.tuplet)
-              patch({ tuplet: TUPLETS[(i - 1 + TUPLETS.length) % TUPLETS.length] })
-            }}
-          >
-            ◀
-          </button>
-          <span>{TUPLET_LABEL[picker.tuplet]}</span>
-          <button
-            onClick={() => {
-              const i = TUPLETS.indexOf(picker.tuplet)
-              patch({ tuplet: TUPLETS[(i + 1) % TUPLETS.length] })
-            }}
-          >
-            ▶
-          </button>
-        </div>
       </div>
 
       {/* ── 臨時記号 ── */}
@@ -195,8 +176,30 @@ export function PickerRollInput({
         </div>
       </div>
 
-      {/* ── 確定ボタン ── */}
+      {/* ── 連符 + 確定ボタン ── */}
       <div className="picker-col commit">
+        <div className="commit-tuplet">
+          <span className="ct-label">連符</span>
+          <button
+            aria-label="連符を減らす"
+            onClick={() => {
+              const i = TUPLETS.indexOf(picker.tuplet)
+              patch({ tuplet: TUPLETS[(i - 1 + TUPLETS.length) % TUPLETS.length] })
+            }}
+          >
+            ◀
+          </button>
+          <span className="ct-value">{TUPLET_LABEL[picker.tuplet]}</span>
+          <button
+            aria-label="連符を増やす"
+            onClick={() => {
+              const i = TUPLETS.indexOf(picker.tuplet)
+              patch({ tuplet: TUPLETS[(i + 1) % TUPLETS.length] })
+            }}
+          >
+            ▶
+          </button>
+        </div>
         <button className="commit-note" onClick={onCommitNote}>
           音符
         </button>
