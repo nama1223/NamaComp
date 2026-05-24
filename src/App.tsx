@@ -87,7 +87,8 @@ export default function App() {
   ) {
     const measure = score.score.parts[partIndex]?.measures[measureIndex]
 
-    // Select mode: tap a note to set/extend the selection.
+    // Select mode: tap a note to set/extend the selection; tap empty space to
+    // just move the cursor (e.g. to position a paste target) — selection kept.
     if (input.mode === 'select') {
       if (target) {
         input.setSelection((prev) =>
@@ -110,7 +111,15 @@ export default function App() {
         )
         input.setCursor({ partIndex, measureIndex, ...target })
       } else {
-        input.setSelection(null)
+        const voiceCount = measure ? measure.voices.length : 1
+        const voiceIndex = Math.min(input.cursor.voiceIndex, voiceCount - 1)
+        const voice = measure?.voices[voiceIndex]
+        input.setCursor({
+          partIndex,
+          measureIndex,
+          voiceIndex,
+          elementIndex: voice ? voice.length : 0,
+        })
       }
       return
     }
@@ -210,6 +219,57 @@ export default function App() {
   }
   function clearSelection() {
     input.setSelection(null)
+  }
+
+  // Resolve a marquee's note hits into a single-part/voice contiguous range
+  // (the part+voice group with the most hits wins).
+  function handleSelectRect(
+    hits: {
+      partIndex: number
+      measureIndex: number
+      voiceIndex: number
+      elementIndex: number
+    }[],
+  ) {
+    if (hits.length === 0) {
+      input.setSelection(null)
+      return
+    }
+    const groups = new Map<string, typeof hits>()
+    for (const h of hits) {
+      const k = `${h.partIndex}:${h.voiceIndex}`
+      const arr = groups.get(k)
+      if (arr) arr.push(h)
+      else groups.set(k, [h])
+    }
+    const best = [...groups.values()].reduce((a, b) =>
+      b.length > a.length ? b : a,
+    )
+
+    const before = (
+      p: { measureIndex: number; elementIndex: number },
+      q: { measureIndex: number; elementIndex: number },
+    ) =>
+      p.measureIndex < q.measureIndex ||
+      (p.measureIndex === q.measureIndex && p.elementIndex <= q.elementIndex)
+    let min = best[0]
+    let max = best[0]
+    for (const h of best) {
+      if (before(h, min)) min = h
+      if (before(max, h)) max = h
+    }
+    input.setSelection({
+      partIndex: best[0].partIndex,
+      voiceIndex: best[0].voiceIndex,
+      anchor: { measureIndex: min.measureIndex, elementIndex: min.elementIndex },
+      focus: { measureIndex: max.measureIndex, elementIndex: max.elementIndex },
+    })
+    input.setCursor({
+      partIndex: best[0].partIndex,
+      measureIndex: max.measureIndex,
+      voiceIndex: best[0].voiceIndex,
+      elementIndex: max.elementIndex,
+    })
   }
   function copySelection() {
     if (!normSelection) return
@@ -600,6 +660,8 @@ export default function App() {
         preview={input.method === 'picker' ? input.previewNote : null}
         previewOverflow={previewOverflow}
         onCellClick={handleCellClick}
+        selectMode={input.mode === 'select'}
+        onSelectRect={handleSelectRect}
         eraser={input.mode === 'eraser'}
         selection={normSelection}
         playMeasure={playback.playMeasure}

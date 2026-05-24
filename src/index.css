@@ -206,6 +206,11 @@ button {
     cursor: grabbing;
   }
 }
+.vex-wrap {
+  position: relative;
+  display: inline-block;
+  min-width: 100%;
+}
 .vex-host {
   display: inline-block;
   min-width: 100%;
@@ -213,6 +218,13 @@ button {
 }
 .vex-host svg {
   display: block;
+}
+.marquee {
+  position: absolute;
+  border: 1.5px solid var(--accent);
+  background: var(--accent-soft);
+  pointer-events: none;
+  z-index: 5;
 }
 
 .zoom-controls {

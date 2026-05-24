@@ -24,6 +24,15 @@ interface StaffAreaProps {
     target?: ClickTarget,
   ) => void
   eraser?: boolean
+  selectMode?: boolean
+  onSelectRect?: (
+    hits: {
+      partIndex: number
+      measureIndex: number
+      voiceIndex: number
+      elementIndex: number
+    }[],
+  ) => void
   selection?: NormSelection | null
   playMeasure?: number | null
   fontToken: MusicFontName
@@ -46,6 +55,8 @@ export function StaffArea({
   previewOverflow,
   onCellClick,
   eraser,
+  selectMode,
+  onSelectRect,
   selection,
   playMeasure,
   fontToken,
@@ -183,6 +194,8 @@ export function StaffArea({
           preview={preview}
           previewOverflow={previewOverflow}
           onCellClick={onCellClick}
+          selectMode={selectMode}
+          onSelectRect={onSelectRect}
           eraser={eraser}
           selection={selection}
           playMeasure={playMeasure}

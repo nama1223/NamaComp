@@ -91,6 +91,17 @@ export interface VexRendererProps {
     measureIndex: number,
     target?: ClickTarget,
   ) => void
+  /** When true, mouse/touch drag draws a marquee that selects notes. */
+  selectMode?: boolean
+  /** Called on marquee release with every note hit inside the rectangle. */
+  onSelectRect?: (
+    hits: {
+      partIndex: number
+      measureIndex: number
+      voiceIndex: number
+      elementIndex: number
+    }[],
+  ) => void
   /** Highlights the cursor cell in red to signal "tap a note to erase". */
   eraser?: boolean
   /** Selected element range (highlighted), or null. */
@@ -109,12 +120,18 @@ export function VexRenderer({
   preview,
   previewOverflow,
   onCellClick,
+  selectMode,
+  onSelectRect,
   eraser,
   selection,
   playMeasure,
   fontToken,
 }: VexRendererProps) {
   const hostRef = useRef<HTMLDivElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const marqueeRef = useRef<HTMLDivElement>(null)
+  const marquee = useRef<{ x0: number; y0: number; moved: number } | null>(null)
+  const draggedRef = useRef(false)
   const hitboxRef = useRef<HitBox[]>([])
 
   useEffect(() => {
@@ -308,6 +325,11 @@ export function VexRenderer({
   ])
 
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
+    // Ignore the click that ends a marquee drag.
+    if (draggedRef.current) {
+      draggedRef.current = false
+      return
+    }
     if (!onCellClick) return
     const svg = hostRef.current?.querySelector('svg')
     if (!svg) return
@@ -336,7 +358,102 @@ export function VexRenderer({
     if (cellHit) onCellClick(cellHit.partIndex, cellHit.measureIndex)
   }
 
-  return <div ref={hostRef} className="vex-host" onClick={handleClick} />
+  // ── Marquee (drag-rectangle) selection, active only in select mode ─────────
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    draggedRef.current = false // fresh interaction; clear any stale drag flag
+    if (!selectMode || (e.pointerType === 'mouse' && e.button !== 0)) return
+    const wrap = wrapRef.current
+    if (!wrap) return
+    e.stopPropagation() // don't let StaffArea start a pan
+    const r = wrap.getBoundingClientRect()
+    marquee.current = { x0: e.clientX - r.left, y0: e.clientY - r.top, moved: 0 }
+    try {
+      wrap.setPointerCapture(e.pointerId)
+    } catch {
+      /* capture not always available */
+    }
+    const m = marqueeRef.current
+    if (m) {
+      m.style.display = 'block'
+      m.style.left = `${marquee.current.x0}px`
+      m.style.top = `${marquee.current.y0}px`
+      m.style.width = '0px'
+      m.style.height = '0px'
+    }
+  }
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const mq = marquee.current
+    const wrap = wrapRef.current
+    if (!mq || !wrap) return
+    const r = wrap.getBoundingClientRect()
+    const x = e.clientX - r.left
+    const y = e.clientY - r.top
+    mq.moved = Math.max(mq.moved, Math.abs(x - mq.x0) + Math.abs(y - mq.y0))
+    const m = marqueeRef.current
+    if (m) {
+      m.style.left = `${Math.min(x, mq.x0)}px`
+      m.style.top = `${Math.min(y, mq.y0)}px`
+      m.style.width = `${Math.abs(x - mq.x0)}px`
+      m.style.height = `${Math.abs(y - mq.y0)}px`
+    }
+  }
+  function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    const mq = marquee.current
+    if (!mq) return
+    marquee.current = null
+    const m = marqueeRef.current
+    if (m) m.style.display = 'none'
+    if (mq.moved < 5) return // treat as a tap → let onClick handle it
+    draggedRef.current = true // suppress the trailing click
+
+    const svg = hostRef.current?.querySelector('svg')
+    const wrap = wrapRef.current
+    if (!svg || !wrap || !onSelectRect) return
+    const sr = svg.getBoundingClientRect()
+    const toLogX = (cx: number) => (cx - sr.left) / zoom
+    const toLogY = (cy: number) => (cy - sr.top) / zoom
+    const wr = wrap.getBoundingClientRect()
+    const lx1 = toLogX(wr.left + mq.x0)
+    const ly1 = toLogY(wr.top + mq.y0)
+    const lx2 = toLogX(e.clientX)
+    const ly2 = toLogY(e.clientY)
+    const minX = Math.min(lx1, lx2)
+    const maxX = Math.max(lx1, lx2)
+    const minY = Math.min(ly1, ly2)
+    const maxY = Math.max(ly1, ly2)
+    const hits = hitboxRef.current
+      .filter(
+        (b) =>
+          b.elementIndex !== undefined &&
+          b.x < maxX &&
+          b.x + b.w > minX &&
+          b.y < maxY &&
+          b.y + b.h > minY,
+      )
+      .map((b) => ({
+        partIndex: b.partIndex,
+        measureIndex: b.measureIndex,
+        voiceIndex: b.voiceIndex ?? 0,
+        elementIndex: b.elementIndex ?? 0,
+      }))
+    onSelectRect(hits)
+  }
+
+  return (
+    <div
+      ref={wrapRef}
+      className="vex-wrap"
+      style={selectMode ? { touchAction: 'none' } : undefined}
+      onClick={handleClick}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
+      <div ref={hostRef} className="vex-host" />
+      <div ref={marqueeRef} className="marquee" style={{ display: 'none' }} />
+    </div>
+  )
 }
 
 interface DrawMeasureArgs {
