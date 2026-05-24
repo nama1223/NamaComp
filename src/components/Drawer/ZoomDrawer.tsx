@@ -4,6 +4,9 @@ interface ZoomDrawerProps {
   onSetZoomY: (z: number) => void
   onSetZoomX: (z: number) => void
   onReset: () => void
+  layoutMode: 'wrap' | 'scroll'
+  onSetLayoutMode: (m: 'wrap' | 'scroll') => void
+  onPreview: () => void
 }
 
 const MIN = 0.4
@@ -20,6 +23,9 @@ export function ZoomDrawer({
   onSetZoomY,
   onSetZoomX,
   onReset,
+  layoutMode,
+  onSetLayoutMode,
+  onPreview,
 }: ZoomDrawerProps) {
   return (
     <div className="drawer-content symbols">
@@ -42,9 +48,28 @@ export function ZoomDrawer({
       </div>
 
       <div className="sym-group">
-        <span className="sym-label">リセット</span>
+        <span className="sym-label">五線の表示</span>
         <div className="sym-row">
-          <button onClick={onReset}>100% に戻す</button>
+          <button
+            className={layoutMode === 'wrap' ? 'active' : ''}
+            onClick={() => onSetLayoutMode('wrap')}
+          >
+            折り返し
+          </button>
+          <button
+            className={layoutMode === 'scroll' ? 'active' : ''}
+            onClick={() => onSetLayoutMode('scroll')}
+          >
+            横スクロール
+          </button>
+        </div>
+      </div>
+
+      <div className="sym-group">
+        <span className="sym-label">出力</span>
+        <div className="sym-row">
+          <button onClick={onReset}>倍率を100%に</button>
+          <button onClick={onPreview}>印刷プレビュー</button>
         </div>
       </div>
     </div>

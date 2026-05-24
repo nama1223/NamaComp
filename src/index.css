@@ -929,6 +929,22 @@ button {
   color: var(--fg-dim);
 }
 
+/* Print preview */
+.modal.preview {
+  width: min(720px, 100%);
+}
+.preview-pages {
+  overflow: auto;
+  padding: 14px;
+  background: #8a8d92;
+}
+.modal-head .manager-add-btn {
+  margin-left: auto;
+}
+.modal-head .manager-add-btn + .modal-close {
+  margin-left: 8px;
+}
+
 /* --- Tablet / desktop ---------------------------------------------------- */
 
 @media (min-width: 720px) {

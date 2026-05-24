@@ -51,6 +51,7 @@ import { ExpressionDrawer } from './components/Drawer/ExpressionDrawer'
 import { ZoomDrawer } from './components/Drawer/ZoomDrawer'
 import { PlaybackDrawer } from './components/Drawer/PlaybackDrawer'
 import { ScoreManager } from './components/ScoreManager'
+import { PrintPreview } from './components/PrintPreview'
 
 export default function App() {
   const { settings, update } = useSettings()
@@ -59,6 +60,7 @@ export default function App() {
   const playback = usePlayback()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showManager, setShowManager] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
 
   const [activeFont, setActiveFont] = useState<MusicFontName>('Bravura')
   useEffect(() => {
@@ -699,6 +701,9 @@ export default function App() {
           onSetZoomY={(z) => update({ zoomY: z })}
           onSetZoomX={(z) => update({ zoomX: z })}
           onReset={() => update({ zoomY: 1, zoomX: 1 })}
+          layoutMode={settings.layoutMode}
+          onSetLayoutMode={(m) => update({ layoutMode: m })}
+          onPreview={() => setShowPreview(true)}
         />
       ),
     },
@@ -784,6 +789,7 @@ export default function App() {
         score={score.score}
         zoomY={settings.zoomY}
         zoomX={settings.zoomX}
+        layoutMode={settings.layoutMode}
         onZoomY={(z) => update({ zoomY: z })}
         cursor={input.cursor}
         preview={input.method === 'picker' ? input.previewNote : null}
@@ -810,6 +816,14 @@ export default function App() {
         onCommitDelete={commitDelete}
         overflow={previewOverflow}
       />
+
+      {showPreview && (
+        <PrintPreview
+          score={score.score}
+          fileName={`${safeName()}.pdf`}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
 
       {showManager && (
         <ScoreManager

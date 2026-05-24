@@ -96,6 +96,8 @@ export interface VexRendererProps {
   zoomY: number
   /** Horizontal spread (note spacing); glyphs unaffected. */
   zoomX: number
+  /** 'wrap' = systems wrap to width; 'scroll' = all measures in one row. */
+  layoutMode?: 'wrap' | 'scroll'
   containerWidth: number
   cursor: Cursor
   preview?: NoteElement | null
@@ -130,6 +132,7 @@ export function VexRenderer({
   score,
   zoomY,
   zoomX,
+  layoutMode,
   containerWidth,
   cursor,
   preview,
@@ -182,10 +185,14 @@ export function VexRenderer({
       colNoteW.push(Math.max(mw, minNeeded))
     }
 
-    // Pack measures into systems by accumulated width (variable widths). The
-    // first measure of a system also carries the clef/key/time (FIRST_EXTRA).
+    // Pack measures into systems. 'scroll' = one long row (horizontal scroll);
+    // 'wrap' = wrap to the width by accumulated measure widths.
     const systems: number[][] = []
-    {
+    if (layoutMode === 'scroll') {
+      const all: number[] = []
+      for (let mi = 0; mi < totalMeasures; mi++) all.push(mi)
+      systems.push(all)
+    } else {
       let row: number[] = []
       let rowW = 0
       for (let mi = 0; mi < totalMeasures; mi++) {
@@ -396,6 +403,7 @@ export function VexRenderer({
     score,
     zoomY,
     zoomX,
+    layoutMode,
     containerWidth,
     cursor,
     preview,

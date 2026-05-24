@@ -12,6 +12,8 @@ export interface Settings {
   zoomY: number
   /** Horizontal spread (note spacing); glyphs are not stretched. */
   zoomX: number
+  /** Staff layout: 'wrap' = systems wrap to width; 'scroll' = one long row. */
+  layoutMode: 'wrap' | 'scroll'
 }
 
 const KEY = 'namacomp_settings_v1'
@@ -22,6 +24,7 @@ const DEFAULTS: Settings = {
   musicFont: 'Bravura',
   zoomY: 1,
   zoomX: 1,
+  layoutMode: 'wrap',
 }
 
 function load(): Settings {

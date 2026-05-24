@@ -15,6 +15,7 @@ interface StaffAreaProps {
   score: Score
   zoomY: number
   zoomX: number
+  layoutMode?: 'wrap' | 'scroll'
   /** Pinch / ctrl-wheel adjust the vertical (size) scale. */
   onZoomY: (zoom: number) => void
   cursor: Cursor
@@ -52,6 +53,7 @@ export function StaffArea({
   score,
   zoomY,
   zoomX,
+  layoutMode,
   onZoomY,
   cursor,
   preview,
@@ -193,6 +195,7 @@ export function StaffArea({
           score={score}
           zoomY={zoomY}
           zoomX={zoomX}
+          layoutMode={layoutMode}
           containerWidth={width}
           cursor={cursor}
           preview={preview}
