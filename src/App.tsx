@@ -36,6 +36,7 @@ import {
 } from './model/duration'
 import { exportMusicXML, importMusicXML } from './io/musicxml'
 import { exportMIDI } from './io/midi'
+import { exportPDF } from './io/pdf'
 import { renderScore } from './audio/render'
 import { encodeWav, encodeMp3 } from './audio/encode'
 import { downloadText, downloadBytes } from './io/download'
@@ -541,6 +542,13 @@ export default function App() {
     downloadBytes(`${safeName()}.mid`, bytes, 'audio/midi')
   }
 
+  function exportPdf() {
+    exportPDF(score.score, `${safeName()}.pdf`).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err)
+      alert(`PDF書き出しに失敗しました: ${msg}`)
+    })
+  }
+
   const [rendering, setRendering] = useState(false)
   async function exportAudio(kind: 'wav' | 'mp3') {
     if (rendering) return
@@ -754,6 +762,7 @@ export default function App() {
         }}
         onExportXML={exportXML}
         onExportMIDI={exportMidi}
+        onExportPDF={exportPdf}
         onExportWav={() => exportAudio('wav')}
         onExportMp3={() => exportAudio('mp3')}
         audioBusy={rendering}

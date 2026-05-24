@@ -12,6 +12,7 @@ interface TopBarProps {
   onNewScore: () => void
   onExportXML: () => void
   onExportMIDI: () => void
+  onExportPDF: () => void
   onExportWav: () => void
   onExportMp3: () => void
   audioBusy: boolean
@@ -37,6 +38,7 @@ export function TopBar({
   onNewScore,
   onExportXML,
   onExportMIDI,
+  onExportPDF,
   onExportWav,
   onExportMp3,
   audioBusy,
@@ -170,6 +172,14 @@ export function TopBar({
               }}
             >
               MIDI書き出し
+            </button>
+            <button
+              onClick={() => {
+                onExportPDF()
+                setMenuOpen(false)
+              }}
+            >
+              PDF書き出し
             </button>
             <button
               disabled={audioBusy}

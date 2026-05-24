@@ -538,7 +538,7 @@ export function VexRenderer({
   )
 }
 
-interface DrawMeasureArgs {
+export interface DrawMeasureArgs {
   ctx: ReturnType<Renderer['getContext']>
   stave: Stave
   clef: Clef
@@ -597,7 +597,7 @@ function buildVoiceTuplets(
   return tuplets
 }
 
-function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
+export function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
   const {
     ctx,
     stave,
