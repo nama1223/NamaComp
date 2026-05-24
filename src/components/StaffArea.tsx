@@ -13,8 +13,10 @@ import type { NormSelection } from '../types/editor'
 
 interface StaffAreaProps {
   score: Score
-  zoom: number
-  onZoomChange: (zoom: number) => void
+  zoomY: number
+  zoomX: number
+  /** Pinch / ctrl-wheel adjust the vertical (size) scale. */
+  onZoomY: (zoom: number) => void
   cursor: Cursor
   preview: NoteElement | null
   previewOverflow: boolean
@@ -48,8 +50,9 @@ function clampZoom(z: number): number {
 
 export function StaffArea({
   score,
-  zoom,
-  onZoomChange,
+  zoomY,
+  zoomX,
+  onZoomY,
   cursor,
   preview,
   previewOverflow,
@@ -116,7 +119,7 @@ export function StaffArea({
     }
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     if (pointers.current.size === 2) {
-      pinch.current = { startDist: dist(), startZoom: zoom }
+      pinch.current = { startDist: dist(), startZoom: zoomY }
     }
   }
   function onPointerMove(e: React.PointerEvent) {
@@ -136,7 +139,7 @@ export function StaffArea({
     if (pinch.current && pointers.current.size === 2) {
       const d = dist()
       if (d > 0 && pinch.current.startDist > 0) {
-        onZoomChange(
+        onZoomY(
           clampZoom((pinch.current.startZoom * d) / pinch.current.startDist),
         )
       }
@@ -168,11 +171,11 @@ export function StaffArea({
     function onWheel(e: WheelEvent) {
       if (!e.ctrlKey && !e.metaKey) return
       e.preventDefault()
-      onZoomChange(clampZoom(zoom * (1 - e.deltaY * 0.0015)))
+      onZoomY(clampZoom(zoomY * (1 - e.deltaY * 0.0015)))
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [zoom, onZoomChange])
+  }, [zoomY, onZoomY])
 
   return (
     <div className="staff-stage">
@@ -188,7 +191,8 @@ export function StaffArea({
       >
         <VexRenderer
           score={score}
-          zoom={zoom}
+          zoomY={zoomY}
+          zoomX={zoomX}
           containerWidth={width}
           cursor={cursor}
           preview={preview}
@@ -201,12 +205,6 @@ export function StaffArea({
           playMeasure={playMeasure}
           fontToken={fontToken}
         />
-      </div>
-
-      <div className="zoom-controls">
-        <button onClick={() => onZoomChange(clampZoom(zoom - 0.2))}>－</button>
-        <span>{Math.round(zoom * 100)}%</span>
-        <button onClick={() => onZoomChange(clampZoom(zoom + 0.2))}>＋</button>
       </div>
 
       {children}

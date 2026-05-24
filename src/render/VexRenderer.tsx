@@ -81,7 +81,10 @@ export interface ClickTarget {
 
 export interface VexRendererProps {
   score: Score
-  zoom: number
+  /** Vertical/uniform scale (glyph size). */
+  zoomY: number
+  /** Horizontal spread (note spacing); glyphs unaffected. */
+  zoomX: number
   containerWidth: number
   cursor: Cursor
   preview?: NoteElement | null
@@ -114,7 +117,8 @@ export interface VexRendererProps {
 
 export function VexRenderer({
   score,
-  zoom,
+  zoomY,
+  zoomX,
   containerWidth,
   cursor,
   preview,
@@ -143,14 +147,27 @@ export function VexRenderer({
     const parts = score.parts
     if (parts.length === 0) return
 
-    const logicalW = Math.max(320, containerWidth / zoom)
+    // Horizontal spread without distorting glyphs: stretch X logical coords by
+    // hstretch so that, after the uniform ctx.scale(zoomY), the pixel width is
+    // base*zoomX while glyphs stay base*zoomY (uniform).
+    const hstretch = zoomX / zoomY
+    const logicalW = Math.max(320, containerWidth / zoomY)
     const usableW = logicalW - LABEL_W - LEFT_PAD - RIGHT_MARGIN
+    const mw = MEASURE_W * hstretch // stretched note-area width per measure
+    // How many stretched measures fit one row. Smaller 横 packs more; larger 横
+    // packs fewer and, once a single measure exceeds the row, overflows →
+    // horizontal scroll.
     const measuresPerSystem = Math.max(
       1,
-      Math.floor((usableW - FIRST_EXTRA) / MEASURE_W) + 1,
+      Math.floor((usableW - FIRST_EXTRA) / mw),
     )
     const totalMeasures = Math.max(...parts.map((p) => p.measures.length))
     const systemCount = Math.max(1, Math.ceil(totalMeasures / measuresPerSystem))
+
+    // Widest possible system → content width (≥ container so SVG fills it).
+    const contentW =
+      LABEL_W + LEFT_PAD + FIRST_EXTRA + measuresPerSystem * mw + RIGHT_MARGIN
+    const logicalContentW = Math.max(logicalW, contentW)
 
     const systemHeight = parts.length * STAVE_H + SYSTEM_GAP
     const logicalH = TOP_PAD + systemCount * systemHeight
@@ -210,9 +227,9 @@ export function VexRenderer({
     }
 
     const renderer = new Renderer(host, Renderer.Backends.SVG)
-    renderer.resize(logicalW * zoom, logicalH * zoom)
+    renderer.resize(logicalContentW * zoomY, logicalH * zoomY)
     const ctx = renderer.getContext()
-    ctx.scale(zoom, zoom)
+    ctx.scale(zoomY, zoomY)
 
     for (let s = 0; s < systemCount; s++) {
       const systemTop = TOP_PAD + s * systemHeight
@@ -223,7 +240,7 @@ export function VexRenderer({
       for (let col = 0; col < colCount; col++) {
         const measureIndex = startMeasure + col
         const isFirst = col === 0
-        const w = MEASURE_W + (isFirst ? FIRST_EXTRA : 0)
+        const w = mw + (isFirst ? FIRST_EXTRA : 0)
 
         for (let pi = 0; pi < parts.length; pi++) {
           const part = parts[pi]
@@ -313,7 +330,8 @@ export function VexRenderer({
     }
   }, [
     score,
-    zoom,
+    zoomY,
+    zoomX,
     containerWidth,
     cursor,
     preview,
@@ -334,8 +352,8 @@ export function VexRenderer({
     const svg = hostRef.current?.querySelector('svg')
     if (!svg) return
     const rect = svg.getBoundingClientRect()
-    const lx = (e.clientX - rect.left) / zoom
-    const ly = (e.clientY - rect.top) / zoom
+    const lx = (e.clientX - rect.left) / zoomY
+    const ly = (e.clientY - rect.top) / zoomY
     const inside = (b: HitBox) =>
       lx >= b.x && lx <= b.x + b.w && ly >= b.y && ly <= b.y + b.h
     // Prefer a specific note (small band) over the whole-measure cell box.
@@ -410,8 +428,8 @@ export function VexRenderer({
     const wrap = wrapRef.current
     if (!svg || !wrap || !onSelectRect) return
     const sr = svg.getBoundingClientRect()
-    const toLogX = (cx: number) => (cx - sr.left) / zoom
-    const toLogY = (cy: number) => (cy - sr.top) / zoom
+    const toLogX = (cx: number) => (cx - sr.left) / zoomY
+    const toLogY = (cy: number) => (cy - sr.top) / zoomY
     const wr = wrap.getBoundingClientRect()
     const lx1 = toLogX(wr.left + mq.x0)
     const ly1 = toLogY(wr.top + mq.y0)

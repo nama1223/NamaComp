@@ -44,6 +44,7 @@ import { SymbolDrawer } from './components/Drawer/SymbolDrawer'
 import { MeasureDrawer } from './components/Drawer/MeasureDrawer'
 import { SelectionDrawer } from './components/Drawer/SelectionDrawer'
 import { ExpressionDrawer } from './components/Drawer/ExpressionDrawer'
+import { ZoomDrawer } from './components/Drawer/ZoomDrawer'
 import { PlaybackDrawer } from './components/Drawer/PlaybackDrawer'
 import { ScoreManager } from './components/ScoreManager'
 
@@ -589,6 +590,20 @@ export default function App() {
       ),
     },
     {
+      id: 'zoom',
+      label: '表示',
+      icon: '⤢',
+      content: (
+        <ZoomDrawer
+          zoomY={settings.zoomY}
+          zoomX={settings.zoomX}
+          onSetZoomY={(z) => update({ zoomY: z })}
+          onSetZoomX={(z) => update({ zoomX: z })}
+          onReset={() => update({ zoomY: 1, zoomX: 1 })}
+        />
+      ),
+    },
+    {
       id: 'playback',
       label: '再生',
       icon: '▶',
@@ -654,8 +669,9 @@ export default function App() {
 
       <StaffArea
         score={score.score}
-        zoom={settings.zoom}
-        onZoomChange={(zoom) => update({ zoom })}
+        zoomY={settings.zoomY}
+        zoomX={settings.zoomX}
+        onZoomY={(z) => update({ zoomY: z })}
         cursor={input.cursor}
         preview={input.method === 'picker' ? input.previewNote : null}
         previewOverflow={previewOverflow}

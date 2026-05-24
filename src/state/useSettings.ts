@@ -8,7 +8,10 @@ export interface Settings {
   theme: ThemeName
   inputMethod: InputMethod
   musicFont: MusicFontName
-  zoom: number
+  /** Vertical scale (uniform note/staff size). */
+  zoomY: number
+  /** Horizontal spread (note spacing); glyphs are not stretched. */
+  zoomX: number
 }
 
 const KEY = 'namacomp_settings_v1'
@@ -17,14 +20,21 @@ const DEFAULTS: Settings = {
   theme: 'light',
   inputMethod: 'picker',
   musicFont: 'Bravura',
-  zoom: 1,
+  zoomY: 1,
+  zoomX: 1,
 }
 
 function load(): Settings {
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return DEFAULTS
-    return { ...DEFAULTS, ...(JSON.parse(raw) as Partial<Settings>) }
+    const saved = JSON.parse(raw) as Partial<Settings> & { zoom?: number }
+    // Migrate legacy single `zoom` to zoomX/zoomY.
+    if (saved.zoom !== undefined && saved.zoomY === undefined) {
+      saved.zoomY = saved.zoom
+      saved.zoomX = saved.zoom
+    }
+    return { ...DEFAULTS, ...saved }
   } catch {
     return DEFAULTS
   }
