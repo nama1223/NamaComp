@@ -46,6 +46,7 @@ import { InputArea } from './components/input/InputArea'
 import { DrawerRail, type DrawerDef } from './components/Drawer/DrawerRail'
 import { SymbolDrawer } from './components/Drawer/SymbolDrawer'
 import { MeasureDrawer } from './components/Drawer/MeasureDrawer'
+import { ClefKeyIcon } from './components/Drawer/ClefKeyIcon'
 import { SelectionDrawer } from './components/Drawer/SelectionDrawer'
 import { ExpressionDrawer } from './components/Drawer/ExpressionDrawer'
 import { ZoomDrawer } from './components/Drawer/ZoomDrawer'
@@ -593,13 +594,7 @@ export default function App() {
       id: 'symbols',
       label: '記号',
       icon: (
-        <span
-          className="smufl-icon"
-          aria-hidden
-          style={{ letterSpacing: '-3px' }}
-        >
-          {''}
-        </span>
+        <ClefKeyIcon color={settings.theme === 'dark' ? '#e8eaee' : '#16181d'} />
       ),
       content: (
         <SymbolDrawer
