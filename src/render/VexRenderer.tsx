@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import {
+  Accidental,
   Beam,
   Curve,
   Formatter,
@@ -380,6 +381,7 @@ export function VexRenderer({
             previewOverflow: !!previewOverflow,
             selection: selection ?? null,
             fg,
+            keyName: keyName(eKey),
           })
 
           // Cell-level hitbox (fallback / append target).
@@ -570,6 +572,8 @@ export interface DrawMeasureArgs {
   selection: NormSelection | null
   /** Foreground colour (light in dark mode) for voice 0 + plain glyphs. */
   fg: string
+  /** Effective key signature name (e.g. 'G', 'Bb') for accidental calc. */
+  keyName: string
 }
 
 interface ElementHit {
@@ -599,15 +603,20 @@ function buildVoiceTuplets(
       ) {
         j++
       }
-      try {
-        tuplets.push(
-          new Tuplet(notes.slice(i, j), {
-            numNotes: tup.actual,
-            notesOccupied: tup.normal,
-          }),
-        )
-      } catch {
-        /* ignore a malformed tuplet group */
+      // Split the run into groups of `actual` notes so consecutive triplets
+      // become separate ┌3┐ brackets (not one big ┌3┐ over 6/9 notes).
+      for (let k = i; k < j; k += tup.actual) {
+        const end = Math.min(k + tup.actual, j)
+        try {
+          tuplets.push(
+            new Tuplet(notes.slice(k, end), {
+              numNotes: tup.actual,
+              notesOccupied: tup.normal,
+            }),
+          )
+        } catch {
+          /* ignore a malformed tuplet group */
+        }
       }
       i = j
     } else {
@@ -631,6 +640,7 @@ export function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
     previewOverflow,
     selection,
     fg,
+    keyName: keySigName,
   } = args
 
   const selHere =
@@ -731,6 +741,14 @@ export function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
   })
 
   if (vexVoices.length === 0) return []
+
+  // Auto-compute displayed accidentals (sharps/flats + naturals to cancel prior
+  // accidentals / the key signature) across all voices of the measure.
+  try {
+    Accidental.applyAccidentals(vexVoices, keySigName)
+  } catch {
+    /* ignore */
+  }
 
   // Derive the note area from the stave's actual note-start (accounts for any
   // clef/key/time drawn on this measure, incl. mid-system changes).

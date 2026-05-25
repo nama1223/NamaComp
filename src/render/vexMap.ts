@@ -1,7 +1,7 @@
 // Maps NamaComp model elements onto VexFlow tickables. Kept separate from the
 // React renderer so the model<->VexFlow translation is testable in isolation.
 
-import { Accidental, Articulation, Dot, StaveNote } from 'vexflow'
+import { Articulation, Dot, StaveNote } from 'vexflow'
 import type { AccidentalKind, Clef, NoteElement, Pitch } from '../types/score'
 import { vexDuration } from '../model/duration'
 
@@ -24,14 +24,6 @@ const STEP_LOWER: Record<string, string> = {
   B: 'b',
 }
 
-const ACCIDENTAL_GLYPH: Record<AccidentalKind, string> = {
-  sharp: '#',
-  flat: 'b',
-  natural: 'n',
-  'double-sharp': '##',
-  'double-flat': 'bb',
-}
-
 // Where a rest sits, per clef (VexFlow centres the rest glyph on this key).
 const REST_KEY: Record<Clef, string> = {
   treble: 'b/4',
@@ -41,8 +33,18 @@ const REST_KEY: Record<Clef, string> = {
   percussion: 'b/4',
 }
 
+const ALTER_LETTER: Record<number, string> = {
+  2: '##',
+  1: '#',
+  0: '',
+  '-1': 'b',
+  '-2': 'bb',
+}
+
+// The key encodes the pitch's alteration so VexFlow's Accidental.applyAccidentals
+// can decide which accidentals (incl. naturals to cancel) to actually display.
 export function pitchToVexKey(p: Pitch): string {
-  return `${STEP_LOWER[p.step]}/${p.octave}`
+  return `${STEP_LOWER[p.step]}${ALTER_LETTER[p.alter] ?? ''}/${p.octave}`
 }
 
 export function alterToAccidental(alter: number): AccidentalKind | null {
@@ -87,15 +89,8 @@ export function buildStaveNote(
     autoStem: true,
   })
 
-  if (!isRest) {
-    el.pitches.forEach((pitch, i) => {
-      const explicit = el.accidentals?.[i] ?? null
-      const kind = explicit ?? alterToAccidental(pitch.alter)
-      if (kind) {
-        note.addModifier(new Accidental(ACCIDENTAL_GLYPH[kind]), i)
-      }
-    })
-  }
+  // Accidentals are applied later via Accidental.applyAccidentals (per measure),
+  // which encodes the key signature + prior-accidental context correctly.
 
   if (el.duration.dots > 0) {
     for (let d = 0; d < el.duration.dots; d++) {

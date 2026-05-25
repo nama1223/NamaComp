@@ -202,6 +202,7 @@ export function renderScorePages(score: Score): HTMLCanvasElement[] {
             previewOverflow: false,
             selection: null,
             fg: '#16181d',
+            keyName: keyName(eKey),
           })
         }
         x += w
