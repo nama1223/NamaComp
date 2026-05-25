@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef } from 'react'
+import { type ReactNode, useEffect, useLayoutEffect, useRef } from 'react'
 
 interface WheelProps<T> {
   items: T[]
@@ -7,13 +7,18 @@ interface WheelProps<T> {
   render: (item: T) => ReactNode
   wrap?: boolean
   className?: string
-  /** Pixels of vertical swipe (and wheel delta) needed to advance one step. */
+  /** Pixels of vertical swipe / wheel delta needed to advance one step. */
   swipeStep?: number
 }
 
-// A compact 3-row vertical "picker roll": higher value on top, current in the
-// middle, lower below. Tapping a neighbour selects it.
-// Supports mouse wheel and vertical touch swipe to scroll through items.
+const ITEM_H = 19 // px per row
+const HALF = 2 // 5 visible rows (centre ± 2)
+const WINDOW = 3 // render ± 3 rows (extra headroom for the slide)
+const VIEWPORT_H = (HALF * 2 + 1) * ITEM_H // 95
+const BASE = (HALF - WINDOW) * ITEM_H // centring offset (= -ITEM_H)
+
+// A 5-row vertical picker with smooth sliding. Higher index renders above the
+// centre (so pitch goes up = up; the caller reverses the array for note values).
 export function Wheel<T>({
   items,
   index,
@@ -24,84 +29,107 @@ export function Wheel<T>({
   swipeStep = 24,
 }: WheelProps<T>) {
   const n = items.length
-  const hiIdx = wrap ? (index + 1) % n : index + 1
-  const loIdx = wrap ? (index - 1 + n) % n : index - 1
-  const hi = items[hiIdx]
-  const lo = items[loIdx]
-
   const containerRef = useRef<HTMLDivElement>(null)
+  const stripRef = useRef<HTMLDivElement>(null)
+  const prevIndex = useRef(index)
 
-  // Always-current "step" function stored in a ref so we can attach the
-  // event listener once and never worry about stale closures.
-  const stepRef = useRef<(dir: 1 | -1) => void>(() => {})
-  stepRef.current = (dir: 1 | -1) => {
-    if (dir === 1 && hi !== undefined) onIndex(hiIdx)
-    if (dir === -1 && lo !== undefined) onIndex(loIdx)
+  const resolve = (off: number): number | null => {
+    const idx = index + off
+    if (wrap) return ((idx % n) + n) % n
+    return idx >= 0 && idx < n ? idx : null
   }
-  // Keep the latest threshold available to the (once-attached) listeners.
+
+  // Smooth slide whenever the index changes.
+  useLayoutEffect(() => {
+    const strip = stripRef.current
+    if (!strip) return
+    let delta = index - prevIndex.current
+    prevIndex.current = index
+    if (wrap && Math.abs(delta) > n / 2) delta -= Math.sign(delta) * n
+    if (delta === 0) {
+      strip.style.transform = `translateY(${BASE}px)`
+      return
+    }
+    strip.style.transition = 'none'
+    strip.style.transform = `translateY(${BASE + delta * ITEM_H}px)`
+    void strip.offsetHeight // force reflow
+    strip.style.transition = 'transform 0.16s ease-out'
+    strip.style.transform = `translateY(${BASE}px)`
+  }, [index, n, wrap])
+
+  // Mouse wheel + vertical swipe.
+  const stepRef = useRef<(d: 1 | -1) => void>(() => {})
+  stepRef.current = (d) => {
+    const target = resolve(d)
+    if (target !== null) onIndex(target)
+  }
   const thresholdRef = useRef(swipeStep)
   thresholdRef.current = swipeStep
-
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-
-    // ── Mouse wheel (non-passive so we can call preventDefault) ──────────
-    // Accumulate delta so trackpads / fine wheels don't over-scroll.
-    let wheelAccum = 0
-    const handleWheel = (e: WheelEvent) => {
+    let acc = 0
+    const onWheel = (e: WheelEvent) => {
       e.preventDefault()
-      wheelAccum += e.deltaY
+      acc += e.deltaY
       const t = thresholdRef.current
-      while (Math.abs(wheelAccum) >= t) {
-        // deltaY < 0 → scroll up → go hi (higher pitch / longer note on top)
-        stepRef.current(wheelAccum < 0 ? 1 : -1)
-        wheelAccum += wheelAccum < 0 ? t : -t
+      while (Math.abs(acc) >= t) {
+        stepRef.current(acc < 0 ? 1 : -1)
+        acc += acc < 0 ? t : -t
       }
     }
-
-    // ── Touch swipe (vertical) ────────────────────────────────────────────
     let startY = 0
-    const handleTouchStart = (e: TouchEvent) => {
+    const onTouchStart = (e: TouchEvent) => {
       startY = e.touches[0].clientY
     }
-    const handleTouchMove = (e: TouchEvent) => {
-      e.preventDefault() // prevent page scroll while swiping the wheel
-      const dy = startY - e.touches[0].clientY // positive = swiped up
+    const onTouchMove = (e: TouchEvent) => {
+      e.preventDefault()
+      const dy = startY - e.touches[0].clientY
       const t = thresholdRef.current
       if (Math.abs(dy) >= t) {
         stepRef.current(dy > 0 ? 1 : -1)
-        startY = e.touches[0].clientY // reset so each step fires once
+        startY = e.touches[0].clientY
       }
     }
-
-    el.addEventListener('wheel', handleWheel, { passive: false })
-    el.addEventListener('touchstart', handleTouchStart, { passive: true })
-    el.addEventListener('touchmove', handleTouchMove, { passive: false })
+    el.addEventListener('wheel', onWheel, { passive: false })
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
     return () => {
-      el.removeEventListener('wheel', handleWheel)
-      el.removeEventListener('touchstart', handleTouchStart)
-      el.removeEventListener('touchmove', handleTouchMove)
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
     }
-  }, []) // attach once; stepRef always stays current
+  }, [])
+
+  // Rows top → bottom: off = +WINDOW … -WINDOW (higher index on top).
+  const offsets: number[] = []
+  for (let off = WINDOW; off >= -WINDOW; off--) offsets.push(off)
 
   return (
-    <div className={`wheel ${className}`} ref={containerRef}>
-      <button
-        className="wheel-cell hi"
-        disabled={hi === undefined}
-        onClick={() => hi !== undefined && onIndex(hiIdx)}
-      >
-        {hi !== undefined ? render(hi) : ''}
-      </button>
-      <div className="wheel-cell cur">{render(items[index])}</div>
-      <button
-        className="wheel-cell lo"
-        disabled={lo === undefined}
-        onClick={() => lo !== undefined && onIndex(loIdx)}
-      >
-        {lo !== undefined ? render(lo) : ''}
-      </button>
+    <div
+      className={`wheel ${className}`}
+      ref={containerRef}
+      style={{ height: VIEWPORT_H }}
+    >
+      <div className="wheel-strip" ref={stripRef}>
+        {offsets.map((off) => {
+          const idx = resolve(off)
+          const item = idx !== null ? items[idx] : null
+          const dist = Math.abs(off)
+          const cls = off === 0 ? 'cur' : dist === 1 ? 'near' : 'far'
+          return (
+            <button
+              key={off}
+              className={`wheel-cell ${cls}`}
+              style={{ height: ITEM_H }}
+              disabled={item === null || off === 0}
+              onClick={() => idx !== null && onIndex(idx)}
+            >
+              {item !== null ? render(item) : ''}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

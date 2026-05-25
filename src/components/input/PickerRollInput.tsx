@@ -42,6 +42,9 @@ const VALUE_LABEL: Record<NoteValue, string> = {
   64: '64分',
 }
 
+// Note values shown shortest-at-bottom (descending duration: whole … 64th).
+const VALUES_DESC: NoteValue[] = [...NOTE_VALUES].reverse() as NoteValue[]
+
 // Tuplet "actual" counts the user can cycle through (0 = none).
 const TUPLETS = [0, 3, 5, 6, 7]
 const TUPLET_LABEL: Record<number, string> = {
@@ -82,7 +85,7 @@ export function PickerRollInput({
       (p) => p.step === picker.step && p.octave === picker.octave,
     ),
   )
-  const valueIndex = NOTE_VALUES.indexOf(picker.value)
+  const valueIndex = VALUES_DESC.indexOf(picker.value)
 
   return (
     <div className={`picker-roll ${overflow ? 'overflow' : ''}`}>
@@ -129,9 +132,9 @@ export function PickerRollInput({
       {/* ── 音価ホイール (端同士ループ) ── */}
       <div className="picker-col length">
         <Wheel
-          items={NOTE_VALUES}
+          items={VALUES_DESC}
           index={valueIndex}
-          onIndex={(i) => patch({ value: NOTE_VALUES[i] })}
+          onIndex={(i) => patch({ value: VALUES_DESC[i] })}
           wrap /* 全音符 ↔ 64分音符 がループ */
           swipeStep={48} /* 音価は感度を下げる（誤操作防止） */
           render={(v) => (
