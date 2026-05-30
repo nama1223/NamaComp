@@ -500,12 +500,14 @@ button {
   padding: 0 8px;
   background: var(--panel);
   border-top: 1px solid var(--border);
+  overflow-x: auto;
   z-index: 24;
 }
 .cbar-nav {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex: 0 0 auto;
 }
 .cbar-nav button {
   width: 32px;
@@ -550,28 +552,47 @@ button {
   font-size: 11px;
   color: var(--fg-dim);
 }
-.cbar-pitch {
+/* Pitch / value scrubbers (shown when there's an editable target). */
+.cbar-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.cbar-scrub {
   display: flex;
   align-items: center;
   gap: 3px;
-  padding: 2px 6px;
+  padding: 1px 4px 1px 6px;
   border: 1px solid var(--accent);
   border-radius: 8px;
   background: var(--accent-soft);
+  touch-action: none; /* let vertical swipe scrub instead of scrolling */
 }
-.cbar-pitch-label {
+.cbar-scrub-label {
   font-size: 11px;
   color: var(--accent);
   font-weight: 700;
 }
-.cbar-pitch button {
-  width: 26px;
-  height: 26px;
+.cbar-scrub-btns {
+  display: flex;
+  flex-direction: column;
+}
+.cbar-scrub-btns button {
+  width: 24px;
+  height: 14px;
   border: 1px solid var(--border);
   background: var(--panel);
-  border-radius: 6px;
-  font-size: 11px;
+  font-size: 8px;
   line-height: 1;
+  padding: 0;
+}
+.cbar-scrub-btns button:first-child {
+  border-radius: 5px 5px 0 0;
+  border-bottom: none;
+}
+.cbar-scrub-btns button:last-child {
+  border-radius: 0 0 5px 5px;
 }
 .cbar-method {
   display: flex;

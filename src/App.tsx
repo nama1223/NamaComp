@@ -33,6 +33,7 @@ import {
   durationToWholeFraction,
   measureCapacityWhole,
   wouldOverflow,
+  NOTE_VALUES,
 } from './model/duration'
 import { exportMusicXML, importMusicXML } from './io/musicxml'
 import { exportMIDI } from './io/midi'
@@ -284,34 +285,28 @@ export default function App() {
       return { ...c, measureIndex: mi, voiceIndex: vi, elementIndex: len }
     })
   }
-  // Re-pitch the note sitting under the cursor by ±1 semitone, so a wrong note
-  // can be corrected in place instead of erased and re-entered.
-  function nudgeCursorNote(delta: number) {
-    const cur = input.cursor
-    const voice =
-      score.score.parts[cur.partIndex]?.measures[cur.measureIndex]?.voices[
-        cur.voiceIndex
-      ]
-    const el = voice?.[cur.elementIndex]
-    if (!el || el.kind !== 'note') return
-    score.mutate((s) =>
-      updateElement(
-        s,
-        cur.partIndex,
-        cur.measureIndex,
-        cur.voiceIndex,
-        cur.elementIndex,
-        (e) =>
-          e.kind === 'note'
-            ? {
-                ...e,
-                pitches: e.pitches.map((p) =>
-                  midiToPitch(pitchToMidi(p) + delta),
-                ),
-              }
-            : e,
-      ),
+  // Re-pitch the target(s) by ±1 semitone — the whole selection when one
+  // exists, otherwise the note under the cursor. Lets a wrong note (or a run)
+  // be corrected in place instead of erased and re-entered. (step: +1 = up.)
+  function transposeTargets(step: number) {
+    applyToTargets((el) =>
+      el.kind === 'note'
+        ? {
+            ...el,
+            pitches: el.pitches.map((p) => midiToPitch(pitchToMidi(p) + step)),
+          }
+        : el,
     )
+  }
+  // Change the note value of the target(s) by one step (+1 = longer toward a
+  // whole note, -1 = shorter). Applies to the selection or the cursor element.
+  function changeValueTargets(step: number) {
+    applyToTargets((el) => {
+      const i = NOTE_VALUES.indexOf(el.duration.value)
+      if (i < 0) return el
+      const ni = Math.max(0, Math.min(NOTE_VALUES.length - 1, i - step))
+      return { ...el, duration: { ...el.duration, value: NOTE_VALUES[ni] } }
+    })
   }
 
   // ── Selection + clipboard ─────────────────────────────────────────────────
@@ -950,12 +945,14 @@ export default function App() {
         onStep={moveStep}
         onMeasure={moveMeasure}
         onSwitchMethod={switchMethod}
-        canNudge={
+        canEdit={
+          !!normSelection ||
           cursorMeasure?.voices[input.cursor.voiceIndex]?.[
             input.cursor.elementIndex
-          ]?.kind === 'note'
+          ] != null
         }
-        onNudge={nudgeCursorNote}
+        onPitch={transposeTargets}
+        onValue={changeValueTargets}
       />
 
       <InputArea
