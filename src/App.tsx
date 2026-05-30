@@ -63,6 +63,8 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showManager, setShowManager] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  // Zen mode hides all chrome so only the staff shows (more room to read).
+  const [zen, setZen] = useState(false)
 
   const [activeFont, setActiveFont] = useState<MusicFontName>('Bravura')
   useEffect(() => {
@@ -824,6 +826,48 @@ export default function App() {
     },
   ]
 
+  // Frequent actions live in the bottom toolbar (reachable, not a far corner).
+  const toolbarActions = (
+    <>
+      <button
+        className={`tb-action play ${playback.isPlaying ? 'on' : ''}`}
+        aria-label={playback.isPlaying ? '停止' : '再生'}
+        title={playback.isPlaying ? '停止' : '再生'}
+        onClick={() => playback.toggle(score.score)}
+      >
+        {playback.isPlaying ? '■' : '▶'}
+      </button>
+      <button
+        className={`tb-action ${input.mode === 'eraser' ? 'on' : ''}`}
+        aria-label="消しゴム"
+        title="消しゴム: 音符をタップで削除"
+        onClick={() =>
+          input.setMode((m) => (m === 'eraser' ? 'normal' : 'eraser'))
+        }
+      >
+        ⌫
+      </button>
+      <button
+        className="tb-action"
+        aria-label="元に戻す"
+        title="元に戻す"
+        disabled={!score.canUndo}
+        onClick={score.undo}
+      >
+        ↩
+      </button>
+      <button
+        className="tb-action"
+        aria-label="やり直し"
+        title="やり直し"
+        disabled={!score.canRedo}
+        onClick={score.redo}
+      >
+        ↪
+      </button>
+    </>
+  )
+
   return (
     <div className="app">
       <input
@@ -837,41 +881,35 @@ export default function App() {
           e.target.value = ''
         }}
       />
-      <TopBar
-        fileName={score.score.fileName}
-        onRename={(fileName) => score.updateMeta({ fileName })}
-        theme={settings.theme}
-        onToggleTheme={() =>
-          update({ theme: settings.theme === 'light' ? 'dark' : 'light' })
-        }
-        musicFont={settings.musicFont}
-        onSetFont={(f) => update({ musicFont: f })}
-        onNewScore={() => {
-          score.resetScore()
-          input.setCursor({
-          partIndex: 0,
-          measureIndex: 0,
-          voiceIndex: 0,
-          elementIndex: 0,
-        })
-        }}
-        onExportXML={exportXML}
-        onExportMIDI={exportMidi}
-        onExportPDF={exportPdf}
-        onExportWav={() => exportAudio('wav')}
-        onExportMp3={() => exportAudio('mp3')}
-        audioBusy={rendering}
-        onImportXML={() => fileInputRef.current?.click()}
-        onOpenManager={() => setShowManager(true)}
-        onUndo={score.undo}
-        onRedo={score.redo}
-        canUndo={score.canUndo}
-        canRedo={score.canRedo}
-        eraser={input.mode === 'eraser'}
-        onToggleEraser={() =>
-          input.setMode((m) => (m === 'eraser' ? 'normal' : 'eraser'))
-        }
-      />
+      {!zen && (
+        <TopBar
+          fileName={score.score.fileName}
+          onRename={(fileName) => score.updateMeta({ fileName })}
+          theme={settings.theme}
+          onToggleTheme={() =>
+            update({ theme: settings.theme === 'light' ? 'dark' : 'light' })
+          }
+          musicFont={settings.musicFont}
+          onSetFont={(f) => update({ musicFont: f })}
+          onNewScore={() => {
+            score.resetScore()
+            input.setCursor({
+              partIndex: 0,
+              measureIndex: 0,
+              voiceIndex: 0,
+              elementIndex: 0,
+            })
+          }}
+          onExportXML={exportXML}
+          onExportMIDI={exportMidi}
+          onExportPDF={exportPdf}
+          onExportWav={() => exportAudio('wav')}
+          onExportMp3={() => exportAudio('mp3')}
+          audioBusy={rendering}
+          onImportXML={() => fileInputRef.current?.click()}
+          onOpenManager={() => setShowManager(true)}
+        />
+      )}
 
       <StaffArea
         score={score.score}
@@ -890,9 +928,11 @@ export default function App() {
         selection={normSelection}
         playMeasure={playback.playMeasure}
         fontToken={activeFont}
-      >
-        <DrawerRail drawers={drawers} />
-      </StaffArea>
+      />
+
+      {!zen && (
+      <>
+      <DrawerRail drawers={drawers} actions={toolbarActions} />
 
       <CursorBar
         measureIndex={input.cursor.measureIndex}
@@ -928,6 +968,17 @@ export default function App() {
         onCommitDelete={commitDelete}
         overflow={previewOverflow}
       />
+      </>
+      )}
+
+      <button
+        className="zen-toggle"
+        aria-label={zen ? 'UIを表示' : '楽譜だけ表示'}
+        title={zen ? 'UIを表示' : '楽譜だけ表示'}
+        onClick={() => setZen((z) => !z)}
+      >
+        {zen ? '⤢' : '⤡'}
+      </button>
 
       {showPreview && (
         <PrintPreview

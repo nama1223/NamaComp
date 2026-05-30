@@ -62,10 +62,31 @@ button {
 }
 
 .app {
+  position: relative; /* anchors the drawer bottom-sheet + zen toggle */
   display: flex;
   flex-direction: column;
   height: 100dvh;
   overflow: hidden;
+}
+
+/* Floating button to hide all chrome (zen) and bring it back. */
+.zen-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 60;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel);
+  opacity: 0.55;
+  font-size: 17px;
+  line-height: 1;
+  box-shadow: var(--shadow);
+}
+.zen-toggle:hover {
+  opacity: 1;
 }
 
 /* --- Top bar -------------------------------------------------------------- */
@@ -254,46 +275,94 @@ button {
   font-size: 16px;
 }
 
-/* --- Drawer rail + panel ------------------------------------------------- */
+/* --- Bottom toolbar (drawer toggles + global actions) -------------------- */
 
-/* In-flow left sidebar so it never covers the staff / part labels. */
-.rail {
-  flex: 0 0 auto;
-  order: -1; /* render to the left of the staff scroll */
-  z-index: 18;
+/* Horizontal so it costs no staff width; scrolls sideways if it overflows. */
+.toolbar {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px 6px;
-  overflow-y: auto;
-  background: var(--panel);
-  border-right: 1px solid var(--border);
-}
-.rail-btn {
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
-  width: 44px;
-  padding: 6px 2px;
+  gap: 10px;
+  height: 44px;
+  padding: 0 8px;
   background: var(--panel);
+  border-top: 1px solid var(--border);
+  overflow-x: auto;
+  overflow-y: hidden;
+  z-index: 24;
+}
+.tb-actions,
+.tb-drawers {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.tb-drawers {
+  margin-left: auto; /* actions left, drawers right */
+}
+.tb-action {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 34px;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
-  font-size: 11px;
-}
-.rail-btn.active {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-}
-.rail-icon {
-  font-size: 18px;
+  background: var(--panel-2);
+  border-radius: 8px;
+  font-size: 17px;
   line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 20px;
+}
+.tb-action:disabled {
+  opacity: 0.32;
+}
+.tb-action.on {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.tb-action.play {
+  color: var(--accent);
+  font-weight: 700;
+}
+.tb-action.play.on {
+  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+}
+.tb-btn {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 40px;
+  height: 36px;
+  padding: 2px 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 10px;
+}
+.tb-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.tb-icon {
+  font-size: 15px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+}
+.drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 41;
+  background: rgba(0, 0, 0, 0.12);
 }
 /* SMuFL glyphs (bass clef + flats) rendered with the loaded music fonts. */
 .smufl-icon {
@@ -307,7 +376,9 @@ button {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 22;
+  z-index: 42;
+  max-height: 64vh;
+  overflow-y: auto;
   background: var(--panel);
   border-top: 1px solid var(--border);
   box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.18);
@@ -339,14 +410,14 @@ button {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
 }
 .drawer-content button {
   border: 1px solid var(--border);
   background: var(--panel-2);
   border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 14px;
+  padding: 5px 9px;
+  font-size: 13px;
 }
 .drawer-content button.active {
   background: var(--accent);
@@ -524,7 +595,7 @@ button {
 .input-area {
   display: flex;
   align-items: stretch;
-  height: clamp(176px, 30vh, 240px);
+  height: clamp(142px, 23vh, 176px);
   background: var(--panel);
   border-top: 1px solid var(--border);
   z-index: 25;
@@ -535,50 +606,101 @@ button {
   overflow: hidden;
 }
 
-/* Mobile-first: a 2-row grid that fits the viewport with no horizontal scroll.
-   Commit buttons span both rows on the right as large thumb targets. */
+/* Compact 3-zone input — [wheels] [small controls] [commit] — with tops
+   aligned so nothing looks ragged, and minimal vertical footprint. */
 .picker-roll {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  align-content: center;
+  justify-content: center;
+  gap: 8px 10px;
   width: 100%;
   height: 100%;
-  padding: 6px 8px;
-  gap: 6px;
-  align-items: center;
-  justify-items: center;
-  align-content: center;
-  overflow-y: auto; /* safety: scroll instead of clipping on very short screens */
-  grid-template-columns: 1fr 1fr minmax(96px, 0.95fr);
-  grid-template-rows: auto auto;
-  grid-template-areas:
-    'pitch  length  commit'
-    'acc    dots    commit';
+  padding: 8px;
+  overflow: auto;
 }
 .picker-roll.overflow {
   background: rgba(226, 59, 59, 0.08);
 }
-.picker-col {
+.pk-wheels {
+  order: 1;
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.pk-wheels .wheel {
+  width: 84px;
+}
+/* Small adjusters drop to their own centered row so the wheels + commit
+   buttons always stay visible on the first row (narrow phones included). */
+.pk-controls {
+  order: 3;
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px 8px;
+}
+.pk-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 30px;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+.pk-ctrl-label {
+  font-size: 10px;
+  color: var(--fg-dim);
+}
+.pk-ctrl-val {
+  min-width: 22px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.pk-ctrl button {
+  width: 22px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  border-radius: 5px;
+}
+.pk-ctrl.pk-acc {
+  gap: 4px;
+  padding: 0 5px;
+}
+.pk-ctrl.pk-acc button {
+  width: 28px;
+  height: 26px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  font-size: 16px;
+}
+.pk-ctrl.pk-acc button.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.pk-commit {
+  order: 2;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
+  gap: 4px;
+  flex: 0 0 auto;
+  width: 78px;
 }
-.picker-col.pitch {
-  grid-area: pitch;
-}
-.picker-col.length {
-  grid-area: length;
-}
-.picker-col.accidentals {
-  grid-area: acc;
-}
-.picker-col.dots {
-  grid-area: dots;
-}
-.picker-col.commit {
-  grid-area: commit;
-  height: 100%;
+.pk-commit button {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 15px;
+  font-weight: 800;
+  padding: 5px 0;
 }
 
 .wheel {
@@ -1083,36 +1205,23 @@ button {
 
 @media (min-width: 720px) {
   .input-area {
-    height: clamp(150px, 22vh, 200px);
+    height: clamp(132px, 20vh, 168px);
   }
   .filename,
   .filename-input {
     max-width: 320px;
   }
-  /* Wide enough for the original single-row picker. */
+  /* More breathing room between the zones on wide screens. */
   .picker-roll {
-    grid-template-columns: repeat(5, auto);
-    grid-template-rows: 1fr;
-    grid-template-areas: 'pitch length acc dots commit';
-    justify-content: center;
-    gap: 24px;
+    gap: 28px;
   }
-  .picker-col {
-    width: auto;
-  }
-  .commit {
-    min-width: 104px;
-  }
-  .wheel {
-    width: 112px;
+  .pk-wheels .wheel {
+    width: 104px;
   }
 }
 
 @media (min-width: 1100px) {
-  .input-area {
-    height: 176px;
-  }
   .picker-roll {
-    gap: 38px;
+    gap: 44px;
   }
 }

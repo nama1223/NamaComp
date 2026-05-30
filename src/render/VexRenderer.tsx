@@ -717,7 +717,6 @@ export function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
 
   modelVoices.forEach((elements, vi) => {
     const showHere = showPreview && vi === cursor.voiceIndex
-    const overflowExisting = showHere && previewOverflow
 
     const dimVoice = isCursorPart && multi && vi !== cursor.voiceIndex
     const vColor = dimVoice
@@ -726,16 +725,14 @@ export function drawMeasure(args: DrawMeasureArgs): ElementHit[] {
     const voiceStyle: NoteStyle = { fillStyle: vColor, strokeStyle: vColor }
 
     // Committed notes (parallel to `elements`) — used for tuplets/ties/slurs/hits.
+    // Existing notes keep their normal colour even when the *next* note would
+    // overflow; only the preview note itself goes red (clearer signal).
     const realNotes: StaveNote[] = elements.map((el, i) => {
       const isSel =
         selHere != null &&
         vi === selHere.voiceIndex &&
         inNormSelection(selHere, measureIndex, i)
-      const style = isSel
-        ? NOTE_STYLE_SELECT
-        : overflowExisting
-          ? NOTE_STYLE_OVERFLOW
-          : voiceStyle
+      const style = isSel ? NOTE_STYLE_SELECT : voiceStyle
       return buildStaveNote(el, clef, style)
     })
 

@@ -49,10 +49,10 @@ const VALUES_DESC: NoteValue[] = [...NOTE_VALUES].reverse() as NoteValue[]
 const TUPLETS = [0, 3, 5, 6, 7]
 const TUPLET_LABEL: Record<number, string> = {
   0: 'なし',
-  3: '3連符',
-  5: '5連符',
-  6: '6連符',
-  7: '7連符',
+  3: '3',
+  5: '5',
+  6: '6',
+  7: '7',
 }
 
 // ── 音程: C1〜B7 の連続配列（クロスオクターブ対応） ──────────────────────────
@@ -78,7 +78,6 @@ export function PickerRollInput({
   onCommitDelete,
   overflow,
 }: PickerRollInputProps) {
-  // 音程インデックス: step + octave の両方から決定
   const pitchIndex = Math.max(
     0,
     PITCH_ITEMS.findIndex(
@@ -87,11 +86,17 @@ export function PickerRollInput({
   )
   const valueIndex = VALUES_DESC.indexOf(picker.value)
 
+  function cycleTuplet(dir: number) {
+    const i = TUPLETS.indexOf(picker.tuplet)
+    patch({ tuplet: TUPLETS[(i + dir + TUPLETS.length) % TUPLETS.length] })
+  }
+
   return (
     <div className={`picker-roll ${overflow ? 'overflow' : ''}`}>
-      {/* ── 音程ホイール (クロスオクターブ / クランプ) ── */}
-      <div className="picker-col pitch">
+      {/* 2 つのホイール（音程 / 音価）を上端そろえで横並び */}
+      <div className="pk-wheels">
         <Wheel
+          className="pitch"
           items={PITCH_ITEMS}
           index={pitchIndex}
           onIndex={(i) =>
@@ -105,38 +110,13 @@ export function PickerRollInput({
             </span>
           )}
         />
-        {/* オクターブ直接ジャンプ用ステッパー（ホイールと連動） */}
-        <div className="octave">
-          <button
-            onClick={() =>
-              patch({
-                octave: Math.max(OCT_MIN, picker.octave - 1),
-              })
-            }
-          >
-            ▼
-          </button>
-          <span>Oct {picker.octave}</span>
-          <button
-            onClick={() =>
-              patch({
-                octave: Math.min(OCT_MAX, picker.octave + 1),
-              })
-            }
-          >
-            ▲
-          </button>
-        </div>
-      </div>
-
-      {/* ── 音価ホイール (端同士ループ) ── */}
-      <div className="picker-col length">
         <Wheel
+          className="length"
           items={VALUES_DESC}
           index={valueIndex}
           onIndex={(i) => patch({ value: VALUES_DESC[i] })}
-          wrap /* 全音符 ↔ 64分音符 がループ */
-          swipeStep={48} /* 音価は感度を下げる（誤操作防止） */
+          wrap
+          swipeStep={48}
           render={(v) => (
             <span>
               <span className="glyph">{VALUE_GLYPH[v]}</span> {VALUE_LABEL[v]}
@@ -145,64 +125,77 @@ export function PickerRollInput({
         />
       </div>
 
-      {/* ── 臨時記号 ── */}
-      <div className="picker-col accidentals">
-        <label className={`chk ${picker.sharp ? 'on' : ''}`}>
-          <input
-            type="checkbox"
-            checked={picker.sharp}
-            onChange={(e) => patch({ sharp: e.target.checked, flat: false })}
-          />
-          ♯
-        </label>
-        <label className={`chk ${picker.flat ? 'on' : ''}`}>
-          <input
-            type="checkbox"
-            checked={picker.flat}
-            onChange={(e) => patch({ flat: e.target.checked, sharp: false })}
-          />
-          ♭
-        </label>
-      </div>
-
-      {/* ── 付点 ── */}
-      <div className="picker-col dots">
-        <span className="dots-label">付点</span>
-        <div className="dots-stepper">
-          <button onClick={() => patch({ dots: Math.max(0, picker.dots - 1) })}>
+      {/* 小さな調整類を 2 列グリッドにまとめてコンパクトに */}
+      <div className="pk-controls">
+        <div className="pk-ctrl">
+          <span className="pk-ctrl-label">Oct</span>
+          <button
+            aria-label="オクターブを下げる"
+            onClick={() =>
+              patch({ octave: Math.max(OCT_MIN, picker.octave - 1) })
+            }
+          >
             ◀
           </button>
-          <span>{picker.dots}</span>
-          <button onClick={() => patch({ dots: Math.min(2, picker.dots + 1) })}>
+          <span className="pk-ctrl-val">{picker.octave}</span>
+          <button
+            aria-label="オクターブを上げる"
+            onClick={() =>
+              patch({ octave: Math.min(OCT_MAX, picker.octave + 1) })
+            }
+          >
+            ▶
+          </button>
+        </div>
+
+        <div className="pk-ctrl pk-acc">
+          <button
+            className={picker.sharp ? 'on' : ''}
+            aria-pressed={picker.sharp}
+            onClick={() => patch({ sharp: !picker.sharp, flat: false })}
+          >
+            ♯
+          </button>
+          <button
+            className={picker.flat ? 'on' : ''}
+            aria-pressed={picker.flat}
+            onClick={() => patch({ flat: !picker.flat, sharp: false })}
+          >
+            ♭
+          </button>
+        </div>
+
+        <div className="pk-ctrl">
+          <span className="pk-ctrl-label">付点</span>
+          <button
+            aria-label="付点を減らす"
+            onClick={() => patch({ dots: Math.max(0, picker.dots - 1) })}
+          >
+            ◀
+          </button>
+          <span className="pk-ctrl-val">{picker.dots}</span>
+          <button
+            aria-label="付点を増やす"
+            onClick={() => patch({ dots: Math.min(2, picker.dots + 1) })}
+          >
+            ▶
+          </button>
+        </div>
+
+        <div className="pk-ctrl">
+          <span className="pk-ctrl-label">連符</span>
+          <button aria-label="連符を減らす" onClick={() => cycleTuplet(-1)}>
+            ◀
+          </button>
+          <span className="pk-ctrl-val">{TUPLET_LABEL[picker.tuplet]}</span>
+          <button aria-label="連符を増やす" onClick={() => cycleTuplet(1)}>
             ▶
           </button>
         </div>
       </div>
 
-      {/* ── 連符 + 確定ボタン ── */}
-      <div className="picker-col commit">
-        <div className="commit-tuplet">
-          <span className="ct-label">連符</span>
-          <button
-            aria-label="連符を減らす"
-            onClick={() => {
-              const i = TUPLETS.indexOf(picker.tuplet)
-              patch({ tuplet: TUPLETS[(i - 1 + TUPLETS.length) % TUPLETS.length] })
-            }}
-          >
-            ◀
-          </button>
-          <span className="ct-value">{TUPLET_LABEL[picker.tuplet]}</span>
-          <button
-            aria-label="連符を増やす"
-            onClick={() => {
-              const i = TUPLETS.indexOf(picker.tuplet)
-              patch({ tuplet: TUPLETS[(i + 1) % TUPLETS.length] })
-            }}
-          >
-            ▶
-          </button>
-        </div>
+      {/* 確定ボタン（右端・縦並び） */}
+      <div className="pk-commit">
         <button className="commit-note" onClick={onCommitNote}>
           音符
         </button>

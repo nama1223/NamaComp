@@ -18,12 +18,6 @@ interface TopBarProps {
   audioBusy: boolean
   onImportXML: () => void
   onOpenManager: () => void
-  onUndo: () => void
-  onRedo: () => void
-  canUndo: boolean
-  canRedo: boolean
-  eraser: boolean
-  onToggleEraser: () => void
 }
 
 const FONTS: MusicFontName[] = ['Bravura', 'Leland', 'Petaluma']
@@ -44,12 +38,6 @@ export function TopBar({
   audioBusy,
   onImportXML,
   onOpenManager,
-  onUndo,
-  onRedo,
-  canUndo,
-  canRedo,
-  eraser,
-  onToggleEraser,
 }: TopBarProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -99,34 +87,6 @@ export function TopBar({
             {fileName}
           </button>
         )}
-      </div>
-
-      <div className="topbar-actions">
-        <button
-          className={`icon-btn eraser-toggle ${eraser ? 'on' : ''}`}
-          aria-label="消しゴム"
-          aria-pressed={eraser}
-          title="消しゴム: 音符をタップで削除"
-          onClick={onToggleEraser}
-        >
-          ⌫
-        </button>
-        <button
-          className="icon-btn"
-          aria-label="元に戻す"
-          disabled={!canUndo}
-          onClick={onUndo}
-        >
-          ↩
-        </button>
-        <button
-          className="icon-btn"
-          aria-label="やり直し"
-          disabled={!canRedo}
-          onClick={onRedo}
-        >
-          ↪
-        </button>
       </div>
 
       {menuOpen && (
