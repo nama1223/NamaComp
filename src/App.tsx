@@ -28,7 +28,7 @@ import type { NoteElement, Score } from './types/score'
 import type { ClickTarget } from './render/VexRenderer'
 import { normalizeSelection } from './types/editor'
 import type { InstrumentPreset } from './model/instruments'
-import { midiToPitch } from './model/pitch'
+import { midiToPitch, pitchToMidi } from './model/pitch'
 import {
   durationToWholeFraction,
   measureCapacityWhole,
@@ -281,6 +281,35 @@ export default function App() {
       const len = part.measures[mi]?.voices[vi]?.length ?? 0
       return { ...c, measureIndex: mi, voiceIndex: vi, elementIndex: len }
     })
+  }
+  // Re-pitch the note sitting under the cursor by ±1 semitone, so a wrong note
+  // can be corrected in place instead of erased and re-entered.
+  function nudgeCursorNote(delta: number) {
+    const cur = input.cursor
+    const voice =
+      score.score.parts[cur.partIndex]?.measures[cur.measureIndex]?.voices[
+        cur.voiceIndex
+      ]
+    const el = voice?.[cur.elementIndex]
+    if (!el || el.kind !== 'note') return
+    score.mutate((s) =>
+      updateElement(
+        s,
+        cur.partIndex,
+        cur.measureIndex,
+        cur.voiceIndex,
+        cur.elementIndex,
+        (e) =>
+          e.kind === 'note'
+            ? {
+                ...e,
+                pitches: e.pitches.map((p) =>
+                  midiToPitch(pitchToMidi(p) + delta),
+                ),
+              }
+            : e,
+      ),
+    )
   }
 
   // ── Selection + clipboard ─────────────────────────────────────────────────
@@ -881,6 +910,12 @@ export default function App() {
         onStep={moveStep}
         onMeasure={moveMeasure}
         onSwitchMethod={switchMethod}
+        canNudge={
+          cursorMeasure?.voices[input.cursor.voiceIndex]?.[
+            input.cursor.elementIndex
+          ]?.kind === 'note'
+        }
+        onNudge={nudgeCursorNote}
       />
 
       <InputArea

@@ -13,6 +13,10 @@ interface CursorBarProps {
   /** Jump the cursor to the previous/next measure. */
   onMeasure: (delta: number) => void
   onSwitchMethod: () => void
+  /** True when the cursor sits on a note that can be re-pitched in place. */
+  canNudge: boolean
+  /** Re-pitch the note under the cursor by ±1 semitone. */
+  onNudge: (delta: number) => void
 }
 
 // Thin strip between the staff and the input area. Shows where the insert
@@ -29,6 +33,8 @@ export function CursorBar({
   onStep,
   onMeasure,
   onSwitchMethod,
+  canNudge,
+  onNudge,
 }: CursorBarProps) {
   return (
     <div className="cursor-bar">
@@ -75,6 +81,26 @@ export function CursorBar({
           ⏭
         </button>
       </div>
+
+      {canNudge && (
+        <div className="cbar-pitch" role="group" aria-label="この音の高さ">
+          <span className="cbar-pitch-label">音程</span>
+          <button
+            aria-label="半音上げる"
+            title="この音を半音上げる"
+            onClick={() => onNudge(1)}
+          >
+            ▲
+          </button>
+          <button
+            aria-label="半音下げる"
+            title="この音を半音下げる"
+            onClick={() => onNudge(-1)}
+          >
+            ▼
+          </button>
+        </div>
+      )}
 
       <div className="cbar-method" role="group" aria-label="入力方式">
         <button
