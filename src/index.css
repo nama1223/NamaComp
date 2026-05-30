@@ -597,10 +597,14 @@ button {
 .input-area {
   display: flex;
   align-items: stretch;
-  height: clamp(150px, 24vh, 184px);
+  height: clamp(150px, 24vh, 188px);
   background: var(--panel);
   border-top: 1px solid var(--border);
   z-index: 25;
+}
+/* Keyboard mode needs more height so the piano is never pushed off-screen. */
+.input-area.input-keyboard {
+  height: clamp(196px, 32vh, 240px);
 }
 /* Slim input-method toggle on the left edge of the input area. */
 .method-tabs {
@@ -659,23 +663,27 @@ button {
 }
 /* Small adjusters drop to their own centered row so the wheels + commit
    buttons always stay visible on the first row (narrow phones included). */
+/* One row, never wrapping (連符 stays on the line); scrolls sideways only if
+   it truly can't fit. */
 .pk-controls {
   order: 3;
   flex-basis: 100%;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
-  gap: 5px 6px;
+  gap: 3px;
+  overflow-x: auto;
 }
 .pk-ctrl {
   display: flex;
   align-items: center;
-  gap: 1px;
+  gap: 0;
   height: 30px;
-  padding: 0 3px;
+  padding: 0 1px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel-2);
+  flex: 0 0 auto;
 }
 .pk-ctrl-label {
   font-size: 10px;
@@ -683,14 +691,14 @@ button {
   padding: 0 1px;
 }
 .pk-ctrl-val {
-  min-width: 16px;
+  min-width: 14px;
   text-align: center;
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .pk-ctrl button {
-  width: 20px;
+  width: 18px;
   height: 24px;
   border: none;
   background: transparent;
@@ -698,15 +706,15 @@ button {
   border-radius: 5px;
 }
 .pk-ctrl.pk-acc {
-  gap: 3px;
-  padding: 0 4px;
+  gap: 2px;
+  padding: 0 3px;
 }
 .pk-ctrl.pk-acc button {
-  width: 28px;
+  width: 25px;
   height: 26px;
   border: 1px solid var(--border);
   background: var(--panel);
-  font-size: 16px;
+  font-size: 15px;
 }
 .pk-ctrl.pk-acc button.on {
   background: var(--accent-soft);
@@ -945,9 +953,9 @@ button {
 .kbd-input {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   height: 100%;
-  padding: 8px 10px;
+  padding: 6px 8px;
 }
 .kbd-input.overflow {
   background: rgba(226, 59, 59, 0.08);
@@ -957,15 +965,16 @@ button {
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 8px 14px;
+  gap: 5px 10px;
+  flex: 0 0 auto;
 }
 .kbd-lens {
   display: flex;
-  gap: 4px;
+  gap: 3px;
 }
 .kbd-lens button {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border: 1px solid var(--border);
   background: var(--panel-2);
   border-radius: 8px;
@@ -979,26 +988,26 @@ button {
 .kbd-step {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 13px;
+  gap: 3px;
+  font-size: 12px;
 }
 .kbd-step button {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border: 1px solid var(--border);
   background: var(--panel-2);
   border-radius: 6px;
 }
 .kbd-num {
-  min-width: 26px;
+  min-width: 22px;
   text-align: center;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 .kbd-piano {
   position: relative;
-  flex: 1;
-  min-height: 96px;
+  flex: 1 1 auto;
+  min-height: 88px;
   display: flex;
   gap: 2px;
   touch-action: manipulation;

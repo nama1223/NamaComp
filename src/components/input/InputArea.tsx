@@ -21,7 +21,7 @@ export function InputArea(props: InputAreaProps) {
   const { method, onSwitchMethod } = props
 
   return (
-    <section className="input-area">
+    <section className={`input-area input-${method}`}>
       <div className="method-tabs" role="group" aria-label="入力方式">
         <button
           className={method === 'picker' ? 'active' : ''}
