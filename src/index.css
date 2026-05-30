@@ -277,17 +277,17 @@ button {
 
 /* --- Bottom toolbar (drawer toggles + global actions) -------------------- */
 
-/* Horizontal so it costs no staff width; scrolls sideways if it overflows. */
+/* Horizontal so it costs no staff width. Wraps to a 2nd row on narrow phones
+   (actions row / drawers row) so nothing is ever hidden off-screen. */
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  height: 44px;
-  padding: 0 8px;
+  gap: 6px 10px;
+  min-height: 44px;
+  padding: 5px 8px;
   background: var(--panel);
   border-top: 1px solid var(--border);
-  overflow-x: auto;
-  overflow-y: hidden;
   z-index: 24;
 }
 .tb-actions,
@@ -295,10 +295,10 @@ button {
   display: flex;
   align-items: center;
   gap: 4px;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
 }
 .tb-drawers {
-  margin-left: auto; /* actions left, drawers right */
+  justify-content: flex-end; /* actions left, drawers right when on one row */
 }
 .tb-action {
   flex: 0 0 auto;
@@ -506,16 +506,16 @@ button {
 .cbar-nav {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   flex: 0 0 auto;
 }
 .cbar-nav button {
-  width: 32px;
+  width: 29px;
   height: 30px;
   border: 1px solid var(--border);
   background: var(--panel-2);
   border-radius: 7px;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1;
 }
 .cbar-nav button:disabled {
@@ -556,21 +556,21 @@ button {
 .cbar-edit {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   flex: 0 0 auto;
 }
 .cbar-scrub {
   display: flex;
   align-items: center;
-  gap: 3px;
-  padding: 1px 4px 1px 6px;
+  gap: 2px;
+  padding: 1px 3px 1px 5px;
   border: 1px solid var(--accent);
   border-radius: 8px;
   background: var(--accent-soft);
   touch-action: none; /* let vertical swipe scrub instead of scrolling */
 }
 .cbar-scrub-label {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--accent);
   font-weight: 700;
 }
@@ -579,7 +579,7 @@ button {
   flex-direction: column;
 }
 .cbar-scrub-btns button {
-  width: 24px;
+  width: 22px;
   height: 14px;
   border: 1px solid var(--border);
   background: var(--panel);
@@ -594,32 +594,36 @@ button {
 .cbar-scrub-btns button:last-child {
   border-radius: 0 0 5px 5px;
 }
-.cbar-method {
-  display: flex;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-  flex: 0 0 auto;
-}
-.cbar-method button {
-  border: none;
-  background: var(--panel-2);
-  padding: 6px 12px;
-  font-size: 13px;
-  font-weight: 600;
-}
-.cbar-method button.active {
-  background: var(--accent);
-  color: #fff;
-}
-
 .input-area {
   display: flex;
   align-items: stretch;
-  height: clamp(142px, 23vh, 176px);
+  height: clamp(150px, 24vh, 184px);
   background: var(--panel);
   border-top: 1px solid var(--border);
   z-index: 25;
+}
+/* Slim input-method toggle on the left edge of the input area. */
+.method-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+}
+.method-tabs button {
+  flex: 1;
+  width: 40px;
+  border: none;
+  background: var(--panel-2);
+  font-size: 12px;
+  font-weight: 700;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  letter-spacing: 1px;
+  padding: 4px 0;
+}
+.method-tabs button.active {
+  background: var(--accent);
+  color: #fff;
 }
 .input-body {
   flex: 1;
@@ -661,14 +665,14 @@ button {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 5px 8px;
+  gap: 5px 6px;
 }
 .pk-ctrl {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 1px;
   height: 30px;
-  padding: 0 4px;
+  padding: 0 3px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel-2);
@@ -676,25 +680,26 @@ button {
 .pk-ctrl-label {
   font-size: 10px;
   color: var(--fg-dim);
+  padding: 0 1px;
 }
 .pk-ctrl-val {
-  min-width: 22px;
+  min-width: 16px;
   text-align: center;
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .pk-ctrl button {
-  width: 22px;
+  width: 20px;
   height: 24px;
   border: none;
   background: transparent;
-  font-size: 12px;
+  font-size: 11px;
   border-radius: 5px;
 }
 .pk-ctrl.pk-acc {
-  gap: 4px;
-  padding: 0 5px;
+  gap: 3px;
+  padding: 0 4px;
 }
 .pk-ctrl.pk-acc button {
   width: 28px;

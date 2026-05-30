@@ -941,10 +941,8 @@ export default function App() {
         }
         voiceIndex={input.cursor.voiceIndex}
         voiceCount={cursorVoiceCount}
-        method={input.method}
         onStep={moveStep}
         onMeasure={moveMeasure}
-        onSwitchMethod={switchMethod}
         canEdit={
           !!normSelection ||
           cursorMeasure?.voices[input.cursor.voiceIndex]?.[
@@ -957,6 +955,7 @@ export default function App() {
 
       <InputArea
         method={input.method}
+        onSwitchMethod={switchMethod}
         picker={input.picker}
         patch={input.patchPicker}
         onCommitNote={commitNote}

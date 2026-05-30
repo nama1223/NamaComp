@@ -5,6 +5,7 @@ import { KeyboardInput } from './KeyboardInput'
 
 interface InputAreaProps {
   method: InputMethod
+  onSwitchMethod: () => void
   picker: PickerState
   patch: (p: Partial<PickerState>) => void
   onCommitNote: () => void
@@ -14,13 +15,28 @@ interface InputAreaProps {
   overflow: boolean
 }
 
-// The input-method toggle now lives in the CursorBar above, so the input area
-// itself is a single full-width body — no side arrows eating thumb space.
+// A slim method toggle sits on the left edge (always visible, costs no extra
+// row); the rest is the picker / keyboard body.
 export function InputArea(props: InputAreaProps) {
-  const { method } = props
+  const { method, onSwitchMethod } = props
 
   return (
     <section className="input-area">
+      <div className="method-tabs" role="group" aria-label="入力方式">
+        <button
+          className={method === 'picker' ? 'active' : ''}
+          onClick={() => method !== 'picker' && onSwitchMethod()}
+        >
+          ロール
+        </button>
+        <button
+          className={method === 'keyboard' ? 'active' : ''}
+          onClick={() => method !== 'keyboard' && onSwitchMethod()}
+        >
+          鍵盤
+        </button>
+      </div>
+
       <div className="input-body">
         {method === 'picker' ? (
           <PickerRollInput

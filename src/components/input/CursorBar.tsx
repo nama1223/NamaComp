@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react'
-import type { InputMethod } from '../../types/editor'
 
 interface CursorBarProps {
   measureIndex: number
@@ -8,12 +7,10 @@ interface CursorBarProps {
   elementCount: number
   voiceIndex: number
   voiceCount: number
-  method: InputMethod
   /** Move the insert cursor by ±1 element (wraps across measures). */
   onStep: (delta: number) => void
   /** Jump the cursor to the previous/next measure. */
   onMeasure: (delta: number) => void
-  onSwitchMethod: () => void
   /** True when there's an editable target (a selection, or a note/rest under
    *  the cursor) so the pitch / value scrubbers are shown. */
   canEdit: boolean
@@ -99,10 +96,8 @@ export function CursorBar({
   elementCount,
   voiceIndex,
   voiceCount,
-  method,
   onStep,
   onMeasure,
-  onSwitchMethod,
   canEdit,
   onPitch,
   onValue,
@@ -159,21 +154,6 @@ export function CursorBar({
           <ScrubControl label="音価" onStep={onValue} />
         </div>
       )}
-
-      <div className="cbar-method" role="group" aria-label="入力方式">
-        <button
-          className={method === 'picker' ? 'active' : ''}
-          onClick={() => method !== 'picker' && onSwitchMethod()}
-        >
-          ロール
-        </button>
-        <button
-          className={method === 'keyboard' ? 'active' : ''}
-          onClick={() => method !== 'keyboard' && onSwitchMethod()}
-        >
-          鍵盤
-        </button>
-      </div>
     </div>
   )
 }
