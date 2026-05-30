@@ -156,12 +156,21 @@ export function VexRenderer({
   const marquee = useRef<{ x0: number; y0: number; moved: number } | null>(null)
   const draggedRef = useRef(false)
   const hitboxRef = useRef<HitBox[]>([])
+  // Logical (pre-zoom) bounds of the cursor's measure cell, captured each draw
+  // so we can scroll it into view when the cursor moves.
+  const cursorRectRef = useRef<{
+    x: number
+    y: number
+    w: number
+    h: number
+  } | null>(null)
 
   useEffect(() => {
     const host = hostRef.current
     if (!host) return
     host.innerHTML = ''
     hitboxRef.current = []
+    cursorRectRef.current = null
 
     const parts = score.parts
     if (parts.length === 0) return
@@ -327,6 +336,7 @@ export function VexRenderer({
             ctx.setFillStyle(eraser ? HILITE_ERASE : HILITE)
             ctx.fillRect(x, y, w, STAVE_H)
             ctx.restore()
+            cursorRectRef.current = { x, y, w, h: STAVE_H }
           }
 
           const eClef = effClef[pi][measureIndex]
@@ -424,6 +434,42 @@ export function VexRenderer({
     selection,
     playMeasure,
     fontToken,
+  ])
+
+  // Scroll the cursor's measure into view when the cursor moves (input,
+  // auto-advance, nav bar, tap). Keyed only on the cursor so it never fights
+  // the user's own panning/zooming, and only nudges when actually off-screen.
+  useEffect(() => {
+    const host = hostRef.current
+    const rect = cursorRectRef.current
+    if (!host || !rect) return
+    const scroller = host.closest('.staff-scroll') as HTMLElement | null
+    if (!scroller) return
+    const hostBox = host.getBoundingClientRect()
+    const scBox = scroller.getBoundingClientRect()
+    const top = hostBox.top - scBox.top + scroller.scrollTop + rect.y * zoomY
+    const left = hostBox.left - scBox.left + scroller.scrollLeft + rect.x * zoomY
+    const h = rect.h * zoomY
+    const w = rect.w * zoomY
+    const pad = 20
+    const viewH = scroller.clientHeight
+    const viewW = scroller.clientWidth
+    if (top < scroller.scrollTop + pad) {
+      scroller.scrollTop = Math.max(0, top - pad)
+    } else if (top + h > scroller.scrollTop + viewH - pad) {
+      scroller.scrollTop = top + h - viewH + pad
+    }
+    if (left < scroller.scrollLeft + pad) {
+      scroller.scrollLeft = Math.max(0, left - pad)
+    } else if (left + w > scroller.scrollLeft + viewW - pad) {
+      scroller.scrollLeft = left + w - viewW + pad
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    cursor.partIndex,
+    cursor.measureIndex,
+    cursor.voiceIndex,
+    cursor.elementIndex,
   ])
 
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {

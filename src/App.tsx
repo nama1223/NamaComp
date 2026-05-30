@@ -43,6 +43,7 @@ import { downloadText, downloadBytes } from './io/download'
 import { TopBar } from './components/TopBar'
 import { StaffArea } from './components/StaffArea'
 import { InputArea } from './components/input/InputArea'
+import { CursorBar } from './components/input/CursorBar'
 import { DrawerRail, type DrawerDef } from './components/Drawer/DrawerRail'
 import { SymbolDrawer } from './components/Drawer/SymbolDrawer'
 import { MeasureDrawer } from './components/Drawer/MeasureDrawer'
@@ -87,6 +88,32 @@ export default function App() {
       time,
     )
   }, [score.score, input.cursor, input.previewNote])
+
+  // Keep the cursor inside the current score's bounds. Undo/redo and measure
+  // deletion edit the score without touching the cursor, which could otherwise
+  // leave it pointing past the end (e.g. "5/4小節").
+  useEffect(() => {
+    input.setCursor((c) => {
+      const parts = score.score.parts
+      if (parts.length === 0) return c
+      const pi = Math.min(c.partIndex, parts.length - 1)
+      const measures = parts[pi].measures
+      const mi = Math.min(c.measureIndex, Math.max(0, measures.length - 1))
+      const voices = measures[mi]?.voices ?? []
+      const vi = Math.min(c.voiceIndex, Math.max(0, voices.length - 1))
+      const ei = Math.min(c.elementIndex, voices[vi]?.length ?? 0)
+      if (
+        pi === c.partIndex &&
+        mi === c.measureIndex &&
+        vi === c.voiceIndex &&
+        ei === c.elementIndex
+      ) {
+        return c // already valid — return same ref so React bails out
+      }
+      return { partIndex: pi, measureIndex: mi, voiceIndex: vi, elementIndex: ei }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [score.score])
 
   function handleCellClick(
     partIndex: number,
@@ -214,6 +241,46 @@ export default function App() {
     const next = input.method === 'picker' ? 'keyboard' : 'picker'
     input.setMethod(next)
     update({ inputMethod: next })
+  }
+
+  // ── Cursor navigation (precise repositioning a tap can't give on touch) ───
+  // Step the insert point ±1 element within the active voice, wrapping to the
+  // adjacent measure at the boundaries.
+  function moveStep(delta: number) {
+    input.setCursor((c) => {
+      const part = score.score.parts[c.partIndex]
+      if (!part) return c
+      const lenAt = (mi: number) =>
+        part.measures[mi]?.voices[c.voiceIndex]?.length ?? 0
+      let mi = c.measureIndex
+      let ei = Math.min(c.elementIndex, lenAt(mi)) + delta
+      if (ei > lenAt(mi)) {
+        if (mi + 1 < part.measures.length) {
+          mi += 1
+          ei = 0
+        } else ei = lenAt(mi)
+      } else if (ei < 0) {
+        if (mi > 0) {
+          mi -= 1
+          ei = lenAt(mi)
+        } else ei = 0
+      }
+      return { ...c, measureIndex: mi, elementIndex: ei }
+    })
+  }
+  // Jump to the previous/next measure (cursor lands at that measure's end).
+  function moveMeasure(delta: number) {
+    input.setCursor((c) => {
+      const part = score.score.parts[c.partIndex]
+      if (!part) return c
+      const mi = Math.max(
+        0,
+        Math.min(part.measures.length - 1, c.measureIndex + delta),
+      )
+      const vi = Math.min(c.voiceIndex, (part.measures[mi]?.voices.length ?? 1) - 1)
+      const len = part.measures[mi]?.voices[vi]?.length ?? 0
+      return { ...c, measureIndex: mi, voiceIndex: vi, elementIndex: len }
+    })
   }
 
   // ── Selection + clipboard ─────────────────────────────────────────────────
@@ -798,9 +865,26 @@ export default function App() {
         <DrawerRail drawers={drawers} />
       </StaffArea>
 
+      <CursorBar
+        measureIndex={input.cursor.measureIndex}
+        measureCount={
+          score.score.parts[input.cursor.partIndex]?.measures.length ??
+          measureCount
+        }
+        elementIndex={input.cursor.elementIndex}
+        elementCount={
+          cursorMeasure?.voices[input.cursor.voiceIndex]?.length ?? 0
+        }
+        voiceIndex={input.cursor.voiceIndex}
+        voiceCount={cursorVoiceCount}
+        method={input.method}
+        onStep={moveStep}
+        onMeasure={moveMeasure}
+        onSwitchMethod={switchMethod}
+      />
+
       <InputArea
         method={input.method}
-        onSwitchMethod={switchMethod}
         picker={input.picker}
         patch={input.patchPicker}
         onCommitNote={commitNote}

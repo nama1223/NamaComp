@@ -49,7 +49,9 @@ export function KeyboardInput({
   onCommitDelete,
   overflow,
 }: KeyboardInputProps) {
-  const [octave, setOctave] = useState(4)
+  // Octave is shared with the picker so switching input methods keeps your
+  // position; transpose is a local "capo" that only shifts what gets committed.
+  const octave = picker.octave
   const [transpose, setTranspose] = useState(0)
 
   function tap(semi: number) {
@@ -102,9 +104,13 @@ export function KeyboardInput({
 
         <div className="kbd-step">
           <span>Oct</span>
-          <button onClick={() => setOctave((o) => Math.max(1, o - 1))}>◀</button>
+          <button onClick={() => patch({ octave: Math.max(1, octave - 1) })}>
+            ◀
+          </button>
           <span className="kbd-num">{octave}</span>
-          <button onClick={() => setOctave((o) => Math.min(7, o + 1))}>▶</button>
+          <button onClick={() => patch({ octave: Math.min(7, octave + 1) })}>
+            ▶
+          </button>
         </div>
 
         <button className="kbd-del" onClick={onCommitDelete}>
