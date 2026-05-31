@@ -424,6 +424,24 @@ export function tempoTimeline(score: Score): number[] {
   return out
 }
 
+/** Effective time signature at each measure index (mid-piece changes persist
+ *  forward; a change measure stores the override, later measures inherit it). */
+export function timeTimeline(score: Score): TimeSignature[] {
+  const count = Math.max(0, ...score.parts.map((p) => p.measures.length))
+  const longest = score.parts.reduce(
+    (a, p) => (p.measures.length >= a.measures.length ? p : a),
+    score.parts[0],
+  )
+  const out: TimeSignature[] = []
+  let cur = score.time
+  for (let i = 0; i < count; i++) {
+    const t = longest?.measures[i]?.time
+    if (t) cur = t
+    out.push(cur)
+  }
+  return out
+}
+
 // --- whole-score transpose --------------------------------------------------
 
 const fifthsToPc = (f: number): number => (((f * 7) % 12) + 12) % 12

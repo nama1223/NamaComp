@@ -27,13 +27,23 @@ const KEY_LABELS = [
   '♯1', '♯2', '♯3', '♯4', '♯5', '♯6', '♯7',
 ]
 
-const TIMES: TimeSignature[] = [
+// Quick one-tap presets for the most common meters.
+const TIME_PRESETS: TimeSignature[] = [
   { beats: 4, beatType: 4 },
   { beats: 3, beatType: 4 },
   { beats: 2, beatType: 4 },
   { beats: 6, beatType: 8 },
+  { beats: 12, beatType: 8 },
   { beats: 2, beatType: 2 },
 ]
+// Denominators must be real note values (powers of 2): rules out 3/5 etc.
+const TIME_DENOMS = [1, 2, 4, 8, 16, 32]
+const TIME_BEATS_MAX = 32
+const stepDenom = (cur: number, dir: number): number => {
+  const i = TIME_DENOMS.indexOf(cur)
+  const ni = Math.max(0, Math.min(TIME_DENOMS.length - 1, (i < 0 ? 2 : i) + dir))
+  return TIME_DENOMS[ni]
+}
 
 // Effective value at the cursor measure (walks overrides up to that measure).
 function effClefAt(part: Part | undefined, mi: number): Clef | undefined {
@@ -144,9 +154,9 @@ export function SymbolDrawer({
       </div>
 
       <div className="sym-group">
-        <span className="sym-label">拍子</span>
+        <span className="sym-label">拍子（{curTime.beats}/{curTime.beatType}）</span>
         <div className="sym-row">
-          {TIMES.map((t) => {
+          {TIME_PRESETS.map((t) => {
             const active =
               curTime.beats === t.beats && curTime.beatType === t.beatType
             return (
@@ -159,6 +169,57 @@ export function SymbolDrawer({
               </button>
             )
           })}
+        </div>
+        <div className="sym-row time-custom">
+          <span className="sym-sublabel">拍数</span>
+          <button
+            aria-label="拍数を減らす"
+            onClick={() =>
+              applyTime({
+                beats: Math.max(1, curTime.beats - 1),
+                beatType: curTime.beatType,
+              })
+            }
+          >
+            ◀
+          </button>
+          <span className="sym-value">{curTime.beats}</span>
+          <button
+            aria-label="拍数を増やす"
+            onClick={() =>
+              applyTime({
+                beats: Math.min(TIME_BEATS_MAX, curTime.beats + 1),
+                beatType: curTime.beatType,
+              })
+            }
+          >
+            ▶
+          </button>
+          <span className="time-slash">/</span>
+          <span className="sym-sublabel">音価</span>
+          <button
+            aria-label="拍子の音価を大きく"
+            onClick={() =>
+              applyTime({
+                beats: curTime.beats,
+                beatType: stepDenom(curTime.beatType, -1),
+              })
+            }
+          >
+            ◀
+          </button>
+          <span className="sym-value">{curTime.beatType}</span>
+          <button
+            aria-label="拍子の音価を小さく"
+            onClick={() =>
+              applyTime({
+                beats: curTime.beats,
+                beatType: stepDenom(curTime.beatType, 1),
+              })
+            }
+          >
+            ▶
+          </button>
         </div>
       </div>
 

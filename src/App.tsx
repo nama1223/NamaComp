@@ -23,6 +23,7 @@ import {
   transposeScore,
   setMeasureTempo,
   tempoTimeline,
+  timeTimeline,
 } from './model/score'
 import type { NoteElement, Score } from './types/score'
 import type { ClickTarget } from './render/VexRenderer'
@@ -84,7 +85,9 @@ export default function App() {
     const measure = part?.measures[input.cursor.measureIndex]
     const voice = measure?.voices[input.cursor.voiceIndex]
     const used = voice ? voiceUsedWhole(voice) : 0
-    const time = measure?.time ?? score.score.time
+    // Effective time at this measure (mid-piece changes persist forward).
+    const time =
+      timeTimeline(score.score)[input.cursor.measureIndex] ?? score.score.time
     return wouldOverflow(
       used,
       durationToWholeFraction(input.previewNote.duration),
@@ -212,10 +215,15 @@ export default function App() {
     const cur = input.cursor
     const measure = score.score.parts[cur.partIndex]?.measures[cur.measureIndex]
     const voice = measure?.voices[cur.voiceIndex]
-    const time = measure?.time ?? score.score.time
+    const time =
+      timeTimeline(score.score)[cur.measureIndex] ?? score.score.time
     const used = voice ? voiceUsedWhole(voice) : 0
     const added = durationToWholeFraction(element.duration)
-    const full = used + added >= measureCapacityWhole(time) - 1e-6
+    // Only auto-advance to the next measure when appending at the end and the
+    // bar is now full — never when inserting in the middle (that would jump the
+    // cursor away mid-edit).
+    const atEnd = !voice || cur.elementIndex >= voice.length
+    const full = atEnd && used + added >= measureCapacityWhole(time) - 1e-6
 
     score.insertAtAutoExpand(cur, element, full)
     if (full) {

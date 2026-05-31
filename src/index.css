@@ -448,6 +448,18 @@ button {
   font-size: 11px;
   color: var(--fg-dim);
 }
+.sym-sublabel {
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+.time-custom {
+  margin-top: 4px;
+}
+.time-slash {
+  font-weight: 700;
+  padding: 0 4px;
+  color: var(--fg-dim);
+}
 .sym-row {
   display: flex;
   gap: 4px;
